@@ -19,7 +19,15 @@ import java.util.Set;
  *   <li><b>开实例</b>：{@code GET /api/protected_instance/open?uuid=&daemonId=}</li>
  *   <li><b>查状态</b>：{@code GET /api/instance?uuid=&daemonId=}，每个小游戏实例查一次</li>
  * </ul>
- * 认证统一走 {@code Authorization: Bearer <apikey>} 请求头。
+ * 认证按官方文档来（docs.mcsmanager.com → apis → get_apikey.md）：
+ * <ul>
+ *   <li>apikey 拼在 <b>URL 参数</b>上：{@code ?uuid=&daemonId=&apikey=}</li>
+ *   <li>两个<b>必需</b>请求头：{@code X-Requested-With: XMLHttpRequest}、
+ *       {@code Content-Type: application/json; charset=utf-8}（缺了会被判成非法请求，直接 403）</li>
+ *   <li>额外再带 {@code Authorization: Bearer <apikey>}：面板同样认，纯冗余保险</li>
+ * </ul>
+ * ⚠ apikey 进了 URL，意味着凡是打印 URL 的地方都必须先过 {@link #mask(String, String)}，
+ * 否则一条广播/日志就把密钥漏出去了。
  *
  * <p>状态码含义（文档里的 InstanceDetail.status）：
  * <pre>
@@ -56,9 +64,6 @@ public final class Mcsm {
             sb.setLength(sb.length() - 1);
         }
         sb.append(path.startsWith("/") ? path : "/" + path);
-        if (params.isEmpty()) {
-            return sb.toString();
-        }
         sb.append('?');
         boolean first = true;
         for (Map.Entry<String, String> e : params.entrySet()) {
@@ -67,6 +72,13 @@ public final class Mcsm {
             }
             first = false;
             sb.append(enc(e.getKey())).append('=').append(enc(e.getValue()));
+        }
+        // 官方文档的鉴权方式：apikey 作为 URL 参数
+        if (c.mcsm.apikey != null && !c.mcsm.apikey.isEmpty()) {
+            if (!first) {
+                sb.append('&');
+            }
+            sb.append("apikey=").append(enc(c.mcsm.apikey));
         }
         return sb.toString();
     }
@@ -123,13 +135,29 @@ public final class Mcsm {
         return d == null ? "" : d;
     }
 
-    /** 认证头；apikey 没读到就返回空（宁可不认证，也不把空串塞进头里） */
+    /**
+     * 请求头。前两个是官方文档点名的<b>必需</b>头，缺了面板直接回 403（不是 401）；
+     * 第三个 {@code Authorization} 是冗余保险 —— 面板同样认，写了不为过。
+     */
     public Map<String, String> authHeaders() {
         Map<String, String> h = new LinkedHashMap<>();
+        h.put("X-Requested-With", "XMLHttpRequest");
+        h.put("Content-Type", "application/json; charset=utf-8");
         if (!c.mcsm.apikey.isEmpty()) {
             h.put("Authorization", "Bearer " + c.mcsm.apikey);
         }
         return h;
+    }
+
+    /** 把文本里的密钥换成 *** —— URL 带上 apikey 后，任何输出 URL 的地方都得先过这里 */
+    public static String mask(String text, String secret) {
+        if (text == null) {
+            return "";
+        }
+        if (secret == null || secret.isEmpty()) {
+            return text;
+        }
+        return text.replace(secret, "***");
     }
 
     // ------------------------------------------------------------------

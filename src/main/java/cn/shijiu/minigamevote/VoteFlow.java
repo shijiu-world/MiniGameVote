@@ -70,7 +70,11 @@ public final class VoteFlow {
                         // 查不到：按 on-query-error 决定算空闲还是算占用
                         if (c.mcsm.errorMeansBusy) {
                             busy = true;
-                            detail = urls.get(i) + " → 查询失败（HTTP " + r.code + "）";
+                            // ⚠ apikey 现在拼在 URL 上：播报里绝不能带原 URL，
+                            //   完整地址只进后台日志（且先把密钥打码）
+                            plugin.getLogger().warning("查询实例状态失败："
+                                    + Mcsm.mask(urls.get(i), c.mcsm.apikey) + " → HTTP " + r.code);
+                            detail = "状态查询失败（HTTP " + r.code + "）";
                         }
                         continue;
                     }

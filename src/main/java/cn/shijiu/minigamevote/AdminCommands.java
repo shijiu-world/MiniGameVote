@@ -94,7 +94,7 @@ public final class AdminCommands implements TabExecutor {
                     return true;
                 }
                 // apikey 只走请求头，不该出现在 URL 里；打码是双保险
-                Msg.send(sender, c.msg("prefix") + "&7已发起异步请求：&f" + mask(url, c.mcsm.apikey));
+                Msg.send(sender, c.msg("prefix") + "&7已发起异步请求：&f" + Mcsm.mask(url, c.mcsm.apikey));
                 final CommandSender target = sender;
                 final VoteConfig cfg = c;
                 plugin.http().request(url, "GET", null, c.http.timeoutMs, c.http.userAgent, hdrs)
@@ -138,7 +138,9 @@ public final class AdminCommands implements TabExecutor {
                 Msg.send(sender, "&7- apikey：&f" + (m.apikey.isEmpty()
                         ? "&c没读到（看后台 WARNING 或 /votegameadmin env）"
                         : "&a已设置（长度 " + m.apikey.length() + "，不显示内容）"));
-                Msg.send(sender, "&7- 认证方式：&fAuthorization 请求头（Bearer）");
+                Msg.send(sender, "&7- 认证方式：&fURL 参数 &aapikey=…&f（打码显示）+ 必需头"
+                        + " &aX-Requested-With: XMLHttpRequest&f、&aContent-Type: application/json"
+                        + " &7（面板文档要求；另附 Authorization: Bearer 冗余）");
                 Msg.send(sender, "&7- 状态查询：&f每个小游戏实例查一次 /api/instance");
                 StringBuilder bs = new StringBuilder();
                 for (int s : m.busyStatus) {
@@ -161,7 +163,7 @@ public final class AdminCommands implements TabExecutor {
                     Msg.send(sender, "&7  （空：没有小游戏配了 uuid）");
                 }
                 for (String u : us) {
-                    Msg.send(sender, "&7- &f" + mask(u, m.apikey));
+                    Msg.send(sender, "&7- &f" + Mcsm.mask(u, m.apikey));
                 }
                 if (!m.watch.isEmpty()) {
                     Msg.send(sender, cfg.msg("prefix") + "&7额外监视的实例：&f" + m.watch.size() + " 个");
@@ -218,17 +220,6 @@ public final class AdminCommands implements TabExecutor {
                 return true;
             }
         }
-    }
-
-    /** 把文本里出现的密钥换成 *** —— URL、日志里都不该出现明文 */
-    private static String mask(String text, String secret) {
-        if (text == null) {
-            return "";
-        }
-        if (secret == null || secret.isEmpty()) {
-            return text;
-        }
-        return text.replace(secret, "***");
     }
 
     @Override

@@ -123,10 +123,17 @@ TrMenu 会把图标构建出来的 `ItemStack` **按会话 id 缓存**（`Item` 
 只对接**当前版本**面板，接口与认证方式写死在插件里，不提供配置开关：
 
 ```
-GET /api/protected_instance/open?uuid=<实例>&daemonId=<守护>   启动实例
-GET /api/instance?uuid=<实例>&daemonId=<守护>                 查实例状态（每个小游戏一次）
-Authorization: Bearer <apikey>                              认证请求头
+GET /api/protected_instance/open?uuid=<实例>&daemonId=<守护>&apikey=<密钥>   启动实例
+GET /api/instance?uuid=<实例>&daemonId=<守护>&apikey=<密钥>                 查实例状态（每个小游戏一次）
+X-Requested-With: XMLHttpRequest                                           必需请求头
+Content-Type: application/json; charset=utf-8                              必需请求头
+Authorization: Bearer <apikey>                                             冗余保险（面板同样认）
 ```
+
+认证方式照面板官方文档来（docs.mcsmanager.com → apis → get_apikey.md）：
+apikey 拼在 **URL 参数**上，且必须带 `X-Requested-With`、`Content-Type` 两个头 ——
+缺头会被面板直接判成非法请求（403），这也是最初"请求全部失败"的原因。
+⚠ 密钥进了 URL，所以插件在所有打印 URL 的地方（`/votegameadmin mcsm|test`、后台日志）都会自动打码成 `***`。
 
 实例状态码：`-1 忙碌 / 0 停止 / 1 停止中 / 2 启动中 / 3 运行中`。
 默认 `busy-status = [2, 3]`，即"启动中/运行中"都算有小游戏在跑 → 本轮投票作废。
