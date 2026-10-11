@@ -103,6 +103,7 @@ denied = "ENTITY_VILLAGER_NO"    # 已投过 / 没权限
 #  支持 & 颜色码。可用变量：
 #    %game% 小游戏名    %id% 小游戏 id    %votes% 当前票数   %threshold% 阈值
 #    %player% 玩家名    %total% 投票人数   %code% HTTP 状态码  %detail% 占用实例
+#    %rank%  名次（从 1 起，只在 stats-line 里有；票数降序，同票按配置顺序）
 # ────────────────────────────────────────────────────────────────────────────
 
 [messages]
@@ -116,7 +117,8 @@ no-permission = "&c你没有投票权限"
 usage = "&7用法：&a/votegame &7打开菜单，&a/votegame <id> &7直接投票"
 
 stats-header = "&6========== 小游戏投票 =========="
-stats-line = "&7- &f%game% &7：&e%votes%&7/&e%threshold%"
+# 按票数降序输出，同票按配置里的先后顺序；不想要名次就把 #%rank% 删掉
+stats-line = "&7#%rank% &f%game% &7：&e%votes%&7/&e%threshold%"
 stats-total = "&7已投票人数：&e%total%"
 stats-none = "&7还没有人投票"
 

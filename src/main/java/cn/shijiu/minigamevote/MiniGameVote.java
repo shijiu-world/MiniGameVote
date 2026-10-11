@@ -240,12 +240,15 @@ public final class MiniGameVote extends JavaPlugin {
         VoteConfig c = config;
         Msg.send(target, c.msg("stats-header"));
         boolean any = false;
-        for (Map.Entry<String, Integer> e : manager.snapshot(c.games.keySet()).entrySet()) {
+        int rank = 0;   // 名次，从 1 开始；排序已经降序，这里只是顺着数
+        for (Map.Entry<String, Integer> e : manager.ranking(c.games.keySet()).entrySet()) {
             int v = e.getValue();
+            rank++;
             if (v > 0) {
                 any = true;
             }
             Msg.send(target, Msg.fill(c.msg("stats-line"),
+                    "rank", String.valueOf(rank),
                     "game", c.plainName(e.getKey()),
                     "votes", String.valueOf(v),
                     "threshold", String.valueOf(c.threshold)));

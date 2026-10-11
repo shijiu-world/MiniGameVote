@@ -27,10 +27,10 @@
 | --- | --- | --- |
 | `/votegame` | 打开投票菜单 | `minigamevote.vote`（默认所有人） |
 | `/votegame <id>` | 直接投票 | 同上 |
-| `/votegame stats` | 看当前票数 | 同上 |
+| `/votegame stats` | 看票数排名（**票数降序**） | 同上 |
 | `/votegameadmin reload` | 重载配置（⚠ 清空票数） | `minigamevote.admin`（默认 op） |
 | `/votegameadmin reset` | 重置票数 | 同上 |
-| `/votegameadmin stats` | 看票数 | 同上 |
+| `/votegameadmin stats` | 看票数排名（同上） | 同上 |
 | `/votegameadmin threshold <数>` | 查看 / 改阈值 | 同上 |
 | `/votegameadmin open` | 给全体在线玩家弹菜单 | 同上 |
 | `/votegameadmin test [url]` | 测一次 HTTP（看状态码和响应，apikey 打码） | 同上 |
@@ -126,11 +126,22 @@ apikey = "${env:MCSM_KEY}"
 | `[http] timeout-ms / user-agent` | 网络参数（查状态和开实例都用） |
 | `[menu] enabled / open-command / reopen-after-vote` | `/votegame` 打开菜单用的命令 |
 | `[sounds]` | 音效枚举名 |
-| `[messages]` | 全部文案，支持 `&` 颜色码 |
+| `[messages]` | 全部文案，支持 `&` 颜色码；`stats-line` 里多了 `%rank%` |
 | `[games.<id>] name / uuid / daemon-id` | 小游戏；id 就是 `/votegame <id>` 用的那个，`uuid` 是面板实例 |
 
 `on-query-error`：`idle` = 查状态失败（超时/连不上面板）当作空闲、继续开服；
 `busy` = 当作占用、作废本轮（更保守，防止重复开服）。
+
+### 票数排名
+
+`/votegame stats` 和 `/votegameadmin stats` 都按**票数降序**输出：票数高的在前，
+票数相同的按 `config.toml` 里 `[games.*]` 的先后顺序（排序是稳定的）。
+
+`stats-line` 里可以用 `%rank%` 打名次（从 1 起），默认模板就是 `"&7#%rank% &f%game% &7：&e%votes%&7/&e%threshold%"`；
+不想要名次把 `#%rank%` 删掉即可。
+
+> ⚠️ 改文案只对**新生成**的 config.toml 生效 —— 插件不会覆盖你已经改过的那份，
+> 想加名次就手动在 `plugins/MiniGameVote/config.toml` 的 `stats-line` 里加上 `%rank%`。
 
 ## TOML 解析
 

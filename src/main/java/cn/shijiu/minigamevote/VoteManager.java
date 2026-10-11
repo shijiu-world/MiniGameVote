@@ -98,11 +98,24 @@ public final class VoteManager {
         return best;
     }
 
-    /** 快照：id → 票数（给 stats 展示用，按传入顺序） */
-    public Map<String, Integer> snapshot(java.util.Collection<String> order) {
-        Map<String, Integer> out = new LinkedHashMap<>();
+    /**
+     * 排名快照：id → 票数，**按票数降序**；票数相同时保持配置里的先后顺序。
+     *
+     * <p>⚠ 先把票数取成快照再排序：直接在比较器里调 {@link #votesOf(String)} 的话，
+     * 排序过程中票数被别的线程改了，比较结果前后不一致，TimSort 可能抛
+     * "Comparison method violates its general contract!"（元素多时才容易撞上，但没必要赌）。
+     */
+    public Map<String, Integer> ranking(java.util.Collection<String> order) {
+        List<Map.Entry<String, Integer>> list = new ArrayList<>();
         for (String id : order) {
-            out.put(id, votesOf(id));
+            list.add(new java.util.AbstractMap.SimpleEntry<>(id, votesOf(id)));
+        }
+        // 降序；List.sort 是稳定排序，所以同票的仍按配置顺序
+        list.sort((a, b) -> Integer.compare(b.getValue(), a.getValue()));
+
+        Map<String, Integer> out = new LinkedHashMap<>();
+        for (Map.Entry<String, Integer> e : list) {
+            out.put(e.getKey(), e.getValue());
         }
         return Collections.unmodifiableMap(out);
     }
