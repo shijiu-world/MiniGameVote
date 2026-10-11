@@ -1,9 +1,9 @@
-title: '&6&l小游戏投票 &7| &e%player_name%'
+title: '&a&l小游戏投票 &7| &e%player_name%'
 rows: 3
 
 layout:
   - '#########'
-  - '#ABCDEF#'
+  - '#ABCDEF##'
   - '#I#####H#'
 
 events:
@@ -38,6 +38,9 @@ icons:
       all:
         - 'player: votegame hide'
         - 'sound: entity.item.pickup'
+        # ⚠ 必须有 refresh：TrMenu 打开菜单后不会自动重解析占位符，
+        #   没这行的话票数要等下次打开菜单才会变
+        - 'refresh'
 
   B:
     display:
@@ -53,6 +56,7 @@ icons:
       all:
         - 'player: votegame tntrun'
         - 'sound: entity.item.pickup'
+        - 'refresh'
 
   C:
     display:
@@ -68,6 +72,7 @@ icons:
       all:
         - 'player: votegame bedwars'
         - 'sound: entity.item.pickup'
+        - 'refresh'
 
   D:
     display:
@@ -83,6 +88,7 @@ icons:
       all:
         - 'player: votegame murder'
         - 'sound: entity.item.pickup'
+        - 'refresh'
 
   E:
     display:
@@ -98,6 +104,7 @@ icons:
       all:
         - 'player: votegame parkour'
         - 'sound: entity.item.pickup'
+        - 'refresh'
 
   F:
     display:
@@ -113,6 +120,7 @@ icons:
       all:
         - 'player: votegame quake'
         - 'sound: entity.item.pickup'
+        - 'refresh'
 
   I:
     display:
@@ -124,8 +132,6 @@ icons:
         - ''
         - '&7当前最多票：&e%minigamevote_leading%'
         - '&7已投票人数：&e%minigamevote_total%'
-        - ''
-        - '&7查看全部票数：&a/votegame stats'
     actions:
       all:
         - 'player: votegame stats'
@@ -135,8 +141,6 @@ icons:
     display:
       material: BARRIER
       name: '&c关闭菜单'
-      lore:
-        - '&7指令：&a/votegame'
     actions:
       all:
         - 'close'

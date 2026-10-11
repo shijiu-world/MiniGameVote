@@ -51,6 +51,29 @@
 
 > 菜单文件所在的服务端和投票插件所在的服务端必须是**同一个**（占位符读的是本地票数）。
 
+### ⚠️ 菜单上的票数不刷新？
+
+**TrMenu 打开菜单后不会重新解析占位符**，所以投票完票数不会自己变。解决办法：每个投票物品的
+点击动作里带上 `refresh`（仓库里的菜单样例已经这么写了）：
+
+```yaml
+    actions:
+      all:
+        - 'player: votegame hide'
+        - 'sound: entity.item.pickup'
+        - 'refresh'          # ← 没有这行，票数要等下次打开菜单才更新
+```
+
+排查顺序：
+
+1. 菜单动作里有没有 `refresh` —— 没有就加上，然后 `trm reload`
+2. 占位符注册了没 —— `/papi parse me %minigamevote_votes_hide%`，
+   返回数字说明插件侧正常（问题在菜单），返回空说明扩展没注册，看后台日志
+   有没有"已注册 PlaceholderAPI 扩展"
+3. 占位符里的 `<id>` 要等于 `config.toml` 里 `[games.<id>]` 的节名，
+   `%minigamevote_votes_hide%` 对应 `[games.hide]`，拼错就返回空
+4. 实在不行把 `reopen-after-vote` 设成 `true`，改成投完票重开菜单（会有闪烁）
+
 ## PlaceholderAPI（软依赖，装了才注册）
 
 | 占位符 | 含义 |

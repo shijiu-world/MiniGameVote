@@ -91,7 +91,10 @@ user-agent = "NineteenWorld-MiniGameVote"
 [menu]
 enabled = true                                   # false = 不给任何人开菜单
 open-command = "trm open minigamevote %player%"  # /votegame 不带参数时由控制台执行这条
-reopen-after-vote = true                         # 投完票重开菜单，用来刷新票数
+# 投完票要不要重开菜单。默认 false —— 刷新票数交给菜单里的 TrMenu `refresh` 动作
+# （每个投票物品点完都带 - 'refresh'），重开反而会闪一下，而且 TrMenu 对已经
+# 打开的菜单可能忽略重复的 open。菜单里没写 refresh 时再把它开成 true。
+reopen-after-vote = false
 
 # ───────────────────────────────── 音效 ─────────────────────────────────────
 
@@ -112,8 +115,8 @@ prefix = "&6[小游戏投票] &r"
 
 vote-success = "&a你投给了 &f%game% &a（%votes%/%threshold%）"
 # 已经投过的再投别的 → 改票，上一票自动取消；%old% 是他原来投的那个
-vote-changed = "&a你改投给了 &f%game% &a（%votes%/%threshold%），原 &7%old%&a 的一票已取消"
-already-voted = "&c你当前已经投给 &f%game%&c 了，换一个就自动改票"
+vote-changed = "&a你改投给了 &f%game% &a（%votes%/%threshold%）"
+already-voted = "&c你当前已经投给 &f%game%&c 了"
 unknown-game = "&c未知的小游戏：&f%id%"
 progress = "&7%player% &f投给了 &e%game% &7（%votes%/%threshold%）"
 progress-changed = "&7%player% &f改投给了 &e%game% &7（%votes%/%threshold%）"
@@ -132,7 +135,7 @@ busy = "&c已经有小游戏正在进行中（%detail%），本轮投票作废�
 no-uuid = "&f%game% &e达到 &c%threshold% &e票，但该小游戏没配实例 uuid（或 MCSM 已关闭），仅重置票数"
 
 reset = "&a已重置所有票数与投票记录"
-reloaded = "&a配置已重载（票数已清空）"
+reloaded = "&a配置已重载"
 threshold-set = "&a当前阈值：&e%threshold%"
 opened-menu = "&a已为 &f%player% &a打开投票菜单"
 test-result = "&7状态码：&e%code% &7(ok=%ok%)"
