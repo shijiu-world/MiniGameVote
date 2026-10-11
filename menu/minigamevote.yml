@@ -31,11 +31,9 @@ icons:
       all: []
 
   # ───────────────────────────────────────────────────────────────
-  # ⚠ 每个带票数占位符的图标都必须有 update: 20
-  #   TrMenu 把图标构建出来的 ItemStack 按会话 id 缓存起来了
-  #   （Item 里是 HashMap<sessionId, ItemStack>），菜单开着的时候
-  #   lore 里的占位符不会再解析一次 —— 不写这行，投完票数字不动。
-  #   20 = 每 20 tick（1 秒）重建一次图标。嫌费性能就调大，比如 40。
+  # 票数刷新现在由插件主动推送（[menu] auto-refresh = true），
+  # 所以图标上不再需要 update: 20 那种定时轮询。
+  # 装不上 TrMenu 接入时，再给每个图标加一行 update: 40 兜底。
   #
   # ⚠ 投票动作里必须是 'update' 而不是 'refresh'
   #   refresh 动作只重新筛选子图标（走 Icon.onRefresh），根本不重建
@@ -44,7 +42,6 @@ icons:
   #   用分号分隔 —— 注意它不认 '*' 这个通配符。
   # ───────────────────────────────────────────────────────────────
   A:
-    update: 20
     display:
       material: PINK_WOOL
       name: '&b躲猫猫'
@@ -61,7 +58,6 @@ icons:
         - 'update'
 
   B:
-    update: 20
     display:
       material: TNT
       name: '&cTNTRun'
@@ -78,7 +74,6 @@ icons:
         - 'update'
 
   C:
-    update: 20
     display:
       material: RED_BED
       name: '&e起床战争'
@@ -95,7 +90,6 @@ icons:
         - 'update'
 
   D:
-    update: 20
     display:
       material: IRON_SWORD
       name: '&a谁是杀手'
@@ -112,7 +106,6 @@ icons:
         - 'update'
 
   E:
-    update: 20
     display:
       material: DIAMOND_BOOTS
       name: '&d跑酷'
@@ -129,7 +122,6 @@ icons:
         - 'update'
 
   F:
-    update: 20
     display:
       material: DIAMOND_HOE
       name: '&6QUAKE'
@@ -146,7 +138,6 @@ icons:
         - 'update'
 
   I:
-    update: 20
     display:
       material: 'head:%player_name%'
       name: '&b%player_name% &6的投票'

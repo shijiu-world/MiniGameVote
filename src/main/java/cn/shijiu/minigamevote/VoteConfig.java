@@ -101,11 +101,18 @@ public final class VoteConfig {
         public final boolean enabled;
         public final String openCommand;
         public final boolean reopenAfterVote;
+        /** 票数一变就主动刷新所有正开着菜单的玩家（软依赖 TrMenu，装了才生效） */
+        public final boolean autoRefresh;
+        /** 要刷新的 TrMenu 菜单 id，对应 menus/<id>.yml 的文件名 */
+        public final String menuId;
 
-        Menu(boolean enabled, String openCommand, boolean reopenAfterVote) {
+        Menu(boolean enabled, String openCommand, boolean reopenAfterVote,
+             boolean autoRefresh, String menuId) {
             this.enabled = enabled;
             this.openCommand = openCommand;
             this.reopenAfterVote = reopenAfterVote;
+            this.autoRefresh = autoRefresh;
+            this.menuId = menuId;
         }
     }
 
@@ -132,6 +139,11 @@ public final class VoteConfig {
         m.put("busy", "&c已经有小游戏正在进行中（%detail%），本轮投票作废，票数已重置！");
         m.put("no-uuid", "&f%game% &e达到 &c%threshold% &e票，但该小游戏没配实例 uuid（或 MCSM 已关闭），仅重置票数");
         m.put("reset", "&a已重置所有票数与投票记录");
+        m.put("diag-trmenu", "&7菜单主动刷新：%state% &7（菜单 &f%menu%&7，auto-refresh=%auto%）");
+        m.put("diag-ok", "&a已接入");
+        m.put("diag-no-plugin", "&c没检测到 TrMenu");
+        m.put("diag-failed", "&c接入失败");
+        m.put("diag-off", "&c配置里关了");
         m.put("reloaded", "&a配置已重载（票数已清空）");
         m.put("threshold-set", "&a当前阈值：&e%threshold%");
         m.put("opened-menu", "&a已为 &f%player% &a打开投票菜单");
@@ -223,7 +235,9 @@ public final class VoteConfig {
         Menu menu = new Menu(
                 Toml.bool(t, "menu.enabled", true),
                 env(Toml.string(t, "menu.open-command", "trm open minigamevote %player%"), envNames, envMissing),
-                Toml.bool(t, "menu.reopen-after-vote", true)
+                Toml.bool(t, "menu.reopen-after-vote", true),
+                Toml.bool(t, "menu.auto-refresh", true),
+                Toml.string(t, "menu.menu-id", "minigamevote")
         );
 
         Map<String, String> messages = new LinkedHashMap<>();

@@ -27,7 +27,7 @@ public final class AdminCommands implements TabExecutor {
         VoteConfig c = plugin.config();
 
         if (args.length == 0) {
-            Msg.send(sender, c.msg("prefix") + "&7用法：&a/votegameadmin reload|reset|stats|threshold <数>|open|test [url]|env|mcsm|version");
+            Msg.send(sender, c.msg("prefix") + "&7用法：&a/votegameadmin reload|reset|stats|threshold <数>|open|test [url]|env|mcsm|trmenu|version");
             return true;
         }
 
@@ -40,6 +40,7 @@ public final class AdminCommands implements TabExecutor {
             case "reset": {
                 plugin.votes().reset();
                 plugin.flow().forceUnlock();
+                plugin.refreshMenus();
                 Msg.send(sender, c.msg("prefix") + c.msg("reset"));
                 return true;
             }
@@ -167,6 +168,35 @@ public final class AdminCommands implements TabExecutor {
                 }
                 return true;
             }
+            case "trmenu": {
+                VoteConfig cfg = plugin.config();
+                VoteConfig.Menu m = cfg.menu;
+                boolean installed = plugin.getServer().getPluginManager().isPluginEnabled("TrMenu");
+                TrMenuHook hook = plugin.trMenu();
+
+                String state;
+                if (!m.autoRefresh) {
+                    state = cfg.msg("diag-off");
+                } else if (!installed) {
+                    state = cfg.msg("diag-no-plugin");
+                } else if (hook != null && hook.available()) {
+                    state = cfg.msg("diag-ok");
+                } else {
+                    state = cfg.msg("diag-failed");
+                }
+                Msg.send(sender, cfg.msg("prefix") + Msg.fill(cfg.msg("diag-trmenu"),
+                        "state", state,
+                        "menu", m.menuId,
+                        "auto", String.valueOf(m.autoRefresh)));
+                if (!m.autoRefresh) {
+                    Msg.send(sender, "&7把 config.toml 里 [menu] auto-refresh 改成 true 再 reload");
+                    Msg.send(sender, "&7不装这个也行：给菜单图标加一行 update: 40 自己轮询");
+                } else if (installed && (hook == null || !hook.available())) {
+                    Msg.send(sender, "&c接入失败多半是 TrMenu 版本对不上 —— 后台日志里有具体异常");
+                    Msg.send(sender, "&7临时方案：给菜单每个票数图标加 update: 40");
+                }
+                return true;
+            }
             case "version": {
                 VoteConfig cur = plugin.config();
                 int withUuid = 0;
@@ -184,7 +214,7 @@ public final class AdminCommands implements TabExecutor {
                 return true;
             }
             default: {
-                Msg.send(sender, c.msg("prefix") + "&7用法：&a/votegameadmin reload|reset|stats|threshold <数>|open|test [url]|env|mcsm|version");
+                Msg.send(sender, c.msg("prefix") + "&7用法：&a/votegameadmin reload|reset|stats|threshold <数>|open|test [url]|env|mcsm|trmenu|version");
                 return true;
             }
         }
@@ -203,7 +233,7 @@ public final class AdminCommands implements TabExecutor {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        List<String> base = Arrays.asList("reload", "reset", "stats", "threshold", "open", "test", "env", "mcsm", "version");
+        List<String> base = Arrays.asList("reload", "reset", "stats", "threshold", "open", "test", "env", "mcsm", "trmenu", "version");
         if (args.length == 1) {
             String prefix = args[0].toLowerCase(Locale.ROOT);
             List<String> out = new ArrayList<>();

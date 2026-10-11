@@ -32,6 +32,7 @@ public final class MiniGameVote extends JavaPlugin {
     private VoteManager manager;
     private HttpService http;
     private VoteFlow flow;
+    private TrMenuHook trMenu;
 
     /**
      * 配置代次：每次 reload 加一。
@@ -64,6 +65,17 @@ public final class MiniGameVote extends JavaPlugin {
         bind("votegameadmin", adminCommands);
 
         getServer().getPluginManager().registerEvents(new VoteListener(this), this);
+
+        // 主动刷新菜单：票数一变就推给所有正开着菜单的人（软依赖，TrMenu 没装就跳过）
+        this.trMenu = new TrMenuHook(getLogger());
+        if (config.menu.autoRefresh) {
+            if (!getServer().getPluginManager().isPluginEnabled("TrMenu")) {
+                getLogger().info("未检测到 TrMenu：菜单只能靠玩家点击时刷新"
+                        + "（要所有人实时看到票数，请给菜单图标加 update: 40）");
+            } else if (trMenu.prepare()) {
+                getLogger().info("已接入 TrMenu：票数变化会主动刷新菜单 " + config.menu.menuId);
+            }
+        }
 
         if (getServer().getPluginManager().isPluginEnabled("PlaceholderAPI")) {
             new VotePlaceholders(this).register();
@@ -194,6 +206,11 @@ public final class MiniGameVote extends JavaPlugin {
         return flow;
     }
 
+    /** TrMenu 接入（软依赖，可能为 null 或不可用） */
+    public TrMenuHook trMenu() {
+        return trMenu;
+    }
+
     /** 打开投票菜单：由控制台执行配置里的 menu.open-command */
     public void openMenu(Player player) {
         VoteConfig c = config;
@@ -203,6 +220,26 @@ public final class MiniGameVote extends JavaPlugin {
         }
         String command = c.menu.openCommand.replace("%player%", player.getName());
         Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
+    }
+
+    /**
+     * 票数变了之后刷新投票菜单，让所有正开着菜单的人立刻看到新票数。
+     *
+     * <p>可以在任意线程调用 —— 这里会切回主线程再刷（TrMenu 那边要改玩家的背包视图）。
+     *
+     * <p>没装 TrMenu、配置关了、或没人开着菜单时，这里什么也不做。
+     */
+    public void refreshMenus() {
+        VoteConfig c = config;
+        if (trMenu == null || c == null || !c.menu.autoRefresh || !trMenu.available()) {
+            return;
+        }
+        String menuId = c.menu.menuId;
+        if (Bukkit.isPrimaryThread()) {
+            trMenu.refresh(menuId);
+        } else {
+            Bukkit.getScheduler().runTask(this, () -> trMenu.refresh(menuId));
+        }
     }
 
     /**

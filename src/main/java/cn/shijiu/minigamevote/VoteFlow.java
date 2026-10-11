@@ -97,6 +97,7 @@ public final class VoteFlow {
                         if (!stale(gen)) {
                             announceBusy(d);
                             plugin.votes().reset();
+                            plugin.refreshMenus();
                         }
                     } finally {
                         finish();
@@ -125,6 +126,7 @@ public final class VoteFlow {
                     if (!stale(gen)) {
                         noUuid(gameId);
                         plugin.votes().reset();
+                        plugin.refreshMenus();
                     }
                 } finally {
                     finish();
@@ -151,6 +153,7 @@ public final class VoteFlow {
                                         "code", code);
                             }
                             plugin.votes().reset();
+                            plugin.refreshMenus();
                         }
                     } finally {
                         // 无论中途出什么事都要解锁，否则 resolving 卡死、后续达标全不触发

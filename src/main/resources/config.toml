@@ -91,9 +91,16 @@ user-agent = "NineteenWorld-MiniGameVote"
 [menu]
 enabled = true                                   # false = 不给任何人开菜单
 open-command = "trm open minigamevote %player%"  # /votegame 不带参数时由控制台执行这条
-# 投完票要不要重开菜单。默认 false —— 刷新票数交给菜单里的 TrMenu `refresh` 动作
-# （每个投票物品点完都带 - 'refresh'），重开反而会闪一下，而且 TrMenu 对已经
-# 打开的菜单可能忽略重复的 open。菜单里没写 refresh 时再把它开成 true。
+menu-id = "minigamevote"                         # 菜单 id，要跟 menus/ 下的文件名一致
+
+# 票数一变就主动刷新所有正开着这个菜单的玩家（软依赖 TrMenu，没装就自动跳过）。
+# 有了它就不需要在菜单图标上写 update: 20 那种定时轮询了 —— 只在票数变化那一刻
+# 刷一次，没人开着菜单时零开销。
+# ⚠ 它刷的是「别人」的菜单；投票者自己的菜单靠菜单里的点击动作 'update' 刷。
+auto-refresh = true
+
+# 投完票要不要重开菜单。默认 false —— 重开会闪一下，而且 TrMenu 对已经打开的
+# 菜单可能忽略重复的 open。刷新票数请用上面的 auto-refresh。
 reopen-after-vote = false
 
 # ───────────────────────────────── 音效 ─────────────────────────────────────
@@ -136,6 +143,13 @@ no-uuid = "&f%game% &e达到 &c%threshold% &e票，但该小游戏没配实例 u
 
 reset = "&a已重置所有票数与投票记录"
 reloaded = "&a配置已重载"
+
+# /votegameadmin trmenu 的诊断输出
+diag-trmenu = "&7菜单主动刷新：%state% &7（菜单 &f%menu%&7，auto-refresh=%auto%）"
+diag-ok = "&a已接入"
+diag-no-plugin = "&c没检测到 TrMenu"
+diag-failed = "&c接入失败"
+diag-off = "&c配置里关了"
 threshold-set = "&a当前阈值：&e%threshold%"
 opened-menu = "&a已为 &f%player% &a打开投票菜单"
 test-result = "&7状态码：&e%code% &7(ok=%ok%)"

@@ -21,10 +21,12 @@ public final class VoteListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
         plugin.votes().remove(event.getPlayer().getUniqueId());
+        plugin.refreshMenus();
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onKick(PlayerKickEvent event) {
         plugin.votes().remove(event.getPlayer().getUniqueId());
+        plugin.refreshMenus();
     }
 }

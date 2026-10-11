@@ -88,6 +88,8 @@ public final class VoteCommands implements TabExecutor {
         MiniGameVote.play(player, c.soundVote, 2.0f);
 
         plugin.announceVote(player, id, votes, result.changed());
+        // 让所有正开着菜单的人（不只投票者自己）看到新票数
+        plugin.refreshMenus();
 
         if (c.menu.enabled && c.menu.reopenAfterVote) {
             plugin.openMenu(player);

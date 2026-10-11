@@ -37,6 +37,7 @@
 | `/votegameadmin test [url]` | 测一次 HTTP（看状态码和响应，apikey 打码） | 同上 |
 | `/votegameadmin env` | 看环境变量读到没（只显示名字，不显示值） | 同上 |
 | `/votegameadmin mcsm` | 看 MCSM 配置和拼好的地址（apikey 打码） | 同上 |
+| `/votegameadmin trmenu` | 看菜单主动刷新接上了没 | 同上 |
 | `/votegameadmin version` | 看版本与运行状态 | 同上 |
 
 ## 投票菜单（TrMenu，软依赖）
@@ -55,16 +56,24 @@
 
 TrMenu 会把图标构建出来的 `ItemStack` **按会话 id 缓存**（`Item` 里是
 `HashMap<sessionId, ItemStack>`），菜单开着的时候 lore 里的占位符不会再解析。
-所以要让票数动起来，得让 TrMenu 重建物品：
+所以票数要动起来，必须让 TrMenu 重建物品。本插件提供两种方式：
 
-1. **图标加 `update: 20`** —— 每 20 tick（1 秒）重建一次，兜底
-2. **投票动作用 `update` 而不是 `refresh`** —— 反编译 TrMenu 3.12.4 确认过：
-   `refresh` 只调 `Icon.onRefresh()` 重新筛选子图标，**不重建物品**；
-   `update` 才是 `onReset()` + `settingItem()`，会真的重新解析 lore
+**方式一（默认，推荐）：插件主动推送**
+
+`[menu] auto-refresh = true` 时，票数一变，插件就调 TrMenu 的接口把**所有正开着菜单的
+玩家**的图标重建一遍。只在投票那一刻刷一次，没人开菜单时零开销，也不用给图标写定时器。
+装了 TrMenu 就自动生效，启动日志会打"已接入 TrMenu"。
+
+**方式二：图标自己定时轮询**（TrMenu 没装上、或版本对不上时的退路）
+
+给每个带票数的图标加 `update: 40`，每 2 秒自己重建一次。
+
+**不管用哪种，点击动作里都必须是 `update` 而不是 `refresh`** —— 反编译 TrMenu 3.12.4 确认过：
+`refresh` 只调 `Icon.onRefresh()` 重新筛选子图标，**不重建物品**；`update` 才是
+`onReset()` + `settingItem()`，会真的重新解析 lore。
 
 ```yaml
   A:
-    update: 20              # ← 周期重建，没这行票数永远停在打开菜单那一刻
     display:
       material: PINK_WOOL
       name: '&b躲猫猫'
@@ -77,16 +86,18 @@ TrMenu 会把图标构建出来的 `ItemStack` **按会话 id 缓存**（`Item` 
         - 'update'          # ← 不带参数 = 刷新本菜单所有图标
 ```
 
-`update` 动作的两个坑：不带参数是刷新全部；带参数时参数是**图标 id**（多个用 `;` 分隔），
-它**不认 `*` 通配符**（写 `update: *` 会静默什么都不刷新）。
+`update` 动作的两个坑：不带参数才是刷新全部；带参数时参数是**图标 id**（多个用 `;` 分隔），
+它**不认 `*` 通配符**（写 `update: *` 会静默什么都不刷新 —— 跟 `refresh: *` 相反）。
 
 排查顺序：
 
-1. 菜单改完有没有 `trm reload` —— TrMenu 不会自己发现菜单文件变了
-2. 占位符注册了没 —— `/papi parse me %minigamevote_votes_hide%`，
+1. **`/votegameadmin trmenu`** —— 直接告诉你接入状态：TrMenu 装没装、接入成功还是失败、
+   菜单 id 对不对。这是最快的判断
+2. 菜单改完有没有 `trm reload` —— TrMenu 不会自己发现菜单文件变了
+3. 占位符注册了没 —— `/papi parse me %minigamevote_votes_hide%`，
    返回数字说明插件侧正常（问题在菜单），返回空说明扩展没注册，看后台日志
    有没有"已注册 PlaceholderAPI 扩展"
-3. 占位符里的 `<id>` 要等于 `config.toml` 里 `[games.<id>]` 的节名，
+4. 占位符里的 `<id>` 要等于 `config.toml` 里 `[games.<id>]` 的节名，
    `%minigamevote_votes_hide%` 对应 `[games.hide]`，拼错就返回空
 4. 实在不行把 `reopen-after-vote` 设成 `true`，改成投完票重开菜单（会有闪烁）
 
@@ -165,6 +176,8 @@ apikey = "${env:MCSM_KEY}"
 | `[mcsm] enabled / url / daemon-id / apikey / busy-status / on-query-error / watch` | MCSM 面板接口与判定规则 |
 | `[http] timeout-ms / user-agent` | 网络参数（查状态和开实例都用） |
 | `[menu] enabled / open-command / reopen-after-vote` | `/votegame` 打开菜单用的命令 |
+| `[menu] menu-id` | 要刷新的菜单 id，跟 `menus/` 下的文件名一致 |
+| `[menu] auto-refresh` | 票数一变就主动刷新所有开着菜单的玩家（软依赖 TrMenu） |
 | `[sounds]` | 音效枚举名 |
 | `[messages]` | 全部文案，支持 `&` 颜色码；`stats-line` 里多了 `%rank%` |
 | `[games.<id>] name / uuid / daemon-id` | 小游戏；id 就是 `/votegame <id>` 用的那个，`uuid` 是面板实例 |
