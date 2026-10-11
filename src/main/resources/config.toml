@@ -142,9 +142,9 @@ stats-line = "&7#%rank% &f%game% &7：&e%votes%&7/&e%threshold%"
 stats-total = "&7已投票人数：&e%total%"
 stats-none = "&7还没有人投票"
 
-threshold-reached = "&f%game% &e达到 &c%threshold% &e票，正在开启…（HTTP %code%）"
-open-failed = "&f%game% &e达到 &c%threshold% &e票，但开启请求失败（HTTP %code%），票数已重置"
-busy = "&c已经有小游戏正在进行中（%detail%），本轮投票作废，票数已重置！"
+threshold-reached = "&f%game% &e达到 &c%threshold% &e票，正在开启…"
+open-failed = "&f%game% &e达到 &c%threshold% &e票，但开启请求失败，票数已重置"
+busy = "&c已经有小游戏正在进行中，本轮投票作废！"
 no-uuid = "&f%game% &e达到 &c%threshold% &e票，但该小游戏没配实例 uuid（或 MCSM 已关闭），仅重置票数"
 
 reset = "&a已重置所有票数与投票记录"
