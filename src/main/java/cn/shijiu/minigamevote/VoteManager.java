@@ -169,4 +169,30 @@ public final class VoteManager {
     public List<UUID> voters() {
         return new ArrayList<>(voted.keySet());
     }
+
+    /** 「谁投了谁」的完整快照，重载配置前先存下来 */
+    public Map<UUID, String> snapshotVotes() {
+        return new LinkedHashMap<>(voted);
+    }
+
+    /**
+     * 把 {@link #snapshotVotes()} 存的票恢复回去（重载配置后用）。
+     *
+     * @param validIds 配置里现在还存在的小游戏 id；投给已删除小游戏的票直接作废
+     * @return 实际恢复了几张票
+     */
+    public synchronized int restoreVotes(Map<UUID, String> snapshot, java.util.Collection<String> validIds) {
+        reset();
+        int n = 0;
+        for (Map.Entry<UUID, String> e : snapshot.entrySet()) {
+            String id = e.getValue();
+            if (id == null || !validIds.contains(id)) {
+                continue;
+            }
+            voted.put(e.getKey(), id);
+            votes.computeIfAbsent(id, k -> new AtomicInteger(0)).incrementAndGet();
+            n++;
+        }
+        return n;
+    }
 }

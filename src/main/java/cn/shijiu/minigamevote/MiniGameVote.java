@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -178,6 +179,17 @@ public final class MiniGameVote extends JavaPlugin {
 
     /** 重载配置；⚠ 会清空当前票数 */
     public void reload() {
+        reload(false);
+    }
+
+    /**
+     * 重载配置。
+     *
+     * @param keepVotes true = 保留玩家已经投的票（改阈值时用：改个数字不该把大家的票清了，
+     *                  而且阈值调低后现有的票可能已经达标，得让它们算数）
+     */
+    public void reload(boolean keepVotes) {
+        Map<java.util.UUID, String> keep = keepVotes ? manager.snapshotVotes() : null;
         try {
             Map<String, Object> t = Toml.parse(configFile());
             this.config = VoteConfig.load(t);
@@ -189,6 +201,15 @@ public final class MiniGameVote extends JavaPlugin {
         }
         generation.incrementAndGet();
         manager.reset();
+        // 保留票数：只恢复「配置里还有这个小游戏」的那些票，
+        // 小游戏被删掉的话，投给它的票自然作废。
+        if (keep != null && !keep.isEmpty()) {
+            int restored = manager.restoreVotes(keep, config.games.keySet());
+            if (restored != keep.size()) {
+                getLogger().info("重载后保留了 " + restored + " 张票（另有 "
+                        + (keep.size() - restored) + " 张投给了配置里已删除的小游戏，已作废）");
+            }
+        }
         flow.forceUnlock();
         // reload 会把票数清空（调阈值也会走到这里）→ 正开着菜单的人得跟着变，
         // 否则菜单上还挂着 reload 之前的旧票数。
@@ -201,33 +222,89 @@ public final class MiniGameVote extends JavaPlugin {
         }
     }
 
-    /** 把阈值写回 config.toml（只改顶层那行 threshold = ...），然后重载 */
-    public boolean setThreshold(int value) {
+    /**
+     * 把阈值写回 config.toml（只改顶层那行 {@code threshold = ...}），然后重载。
+     *
+     * <p>⚠ 改的是磁盘上的文件本身，不是"内存里改一下" —— 服主在面板文件管理器里
+     * 看到的就是这个值。写回的细节（第几行、原来写啥、现在写啥）通过返回值回传，
+     * 命令那边直接显示给服主核对。
+     *
+     * @return 写回结果；{@link ConfigEdit.Result#ok} 为 false 时配置没有被改动
+     */
+    public ConfigEdit.Result setThreshold(int value) {
+        Path file = configFile();
         try {
-            Path file = configFile();
             if (!Files.exists(file)) {
                 saveResource("config.toml", false);
             }
             List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
-            boolean replaced = false;
-            for (int i = 0; i < lines.size(); i++) {
-                String trimmed = lines.get(i).trim();
-                if (trimmed.startsWith("#") || !trimmed.matches("^threshold\\s*=.*$")) {
-                    continue;
-                }
-                lines.set(i, "threshold = " + value);
-                replaced = true;
-                break;
+            ConfigEdit.Result r = ConfigEdit.setTopLevel(lines, "threshold", String.valueOf(value));
+            if (!r.ok) {
+                return r;
             }
-            if (!replaced) {
-                lines.add(0, "threshold = " + value);
+            writeAtomic(file, lines);
+            getLogger().info("config.toml 第 " + r.line + " 行 → " + r.after
+                    + (r.uncommented ? "（原来被注释掉了，已取消注释）" : "")
+                    + (r.added ? "（原来没有这一项，已新增）" : ""));
+            reload(true);
+
+            // 阈值调低后，现有的票可能已经达标 —— 补一次判定，别让它们干等着
+            VoteConfig c = config;
+            String reached = manager.firstReached(c.games.keySet(), c.threshold);
+            if (reached != null) {
+                getLogger().info("新阈值 " + c.threshold + " 下，" + reached + " 已有 "
+                        + manager.votesOf(reached) + " 票，立即进入开服流程");
+                flow.onVote(reached);
             }
-            Files.write(file, lines, StandardCharsets.UTF_8);
-            reload();
-            return true;
+            return r;
         } catch (IOException e) {
             getLogger().log(Level.SEVERE, "写回 threshold 失败", e);
-            return false;
+            return ConfigEdit.Result.fail(e.toString());
+        }
+    }
+
+    /**
+     * 原子写：先写同目录的临时文件，再 move 过去。
+     *
+     * <p>直接 {@code Files.write} 覆盖的话，写到一半崩了/断电，配置文件就剩半截，
+     * 插件下次起来直接读不出来。临时文件 + move 要么全换要么不换。
+     */
+    private void writeAtomic(Path file, List<String> lines) throws IOException {
+        Path dir = file.getParent();
+        if (dir == null) {
+            Files.write(file, lines, StandardCharsets.UTF_8);
+            return;
+        }
+        Path tmp = Files.createTempFile(dir, ".minigamevote-", ".tmp");
+        try {
+            Files.write(tmp, lines, StandardCharsets.UTF_8);
+            try {
+                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                // 个别文件系统不支持原子移动，退化成普通替换（至少还是"先写完整的临时文件"）
+                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(tmp);
+        }
+    }
+
+    /**
+     * 诊断用：磁盘上 config.toml 里 threshold 那行长什么样。
+     *
+     * <p>用来回答"我在游戏里改了，配置文件怎么看着没变"—— 插件读的是哪个文件、
+     * 文件里那行现在写的啥、跟内存里的值一不一致，一眼就能对上。
+     */
+    public ConfigEdit.Found findThresholdLine() {
+        try {
+            Path file = configFile();
+            if (!Files.exists(file)) {
+                return new ConfigEdit.Found(-1, "", false);
+            }
+            return ConfigEdit.findTopLevel(Files.readAllLines(file, StandardCharsets.UTF_8), "threshold");
+        } catch (IOException e) {
+            getLogger().log(Level.WARNING, "读 config.toml 失败，无法给出磁盘原文", e);
+            return new ConfigEdit.Found(-1, "", false);
         }
     }
 

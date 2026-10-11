@@ -6,6 +6,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabExecutor;
 import org.bukkit.entity.Player;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -27,7 +28,7 @@ public final class AdminCommands implements TabExecutor {
         VoteConfig c = plugin.config();
 
         if (args.length == 0) {
-            Msg.send(sender, c.msg("prefix") + "&7用法：&a/votegameadmin reload|reset|stats|threshold <数>|open|test [url]|env|mcsm|trmenu|version");
+            Msg.send(sender, c.msg("prefix") + "&7用法：&a/votegameadmin reload|reset|stats|threshold <数>|open|test [url]|env|mcsm|trmenu|config|version");
             return true;
         }
 
@@ -56,17 +57,32 @@ public final class AdminCommands implements TabExecutor {
                             Msg.send(sender, c.msg("prefix") + "&c阈值至少是 1");
                             return true;
                         }
-                        if (!plugin.setThreshold(n)) {
-                            Msg.send(sender, c.msg("prefix") + "&c写回 config.toml 失败，看后台日志");
+                        ConfigEdit.Result r = plugin.setThreshold(n);
+                        if (!r.ok) {
+                            Msg.send(sender, c.msg("prefix")
+                                    + Msg.fill(c.msg("threshold-write-failed"), "error", String.valueOf(r.error)));
                             return true;
                         }
                         c = plugin.config();
+                        // 把"改了文件哪一行"直接回显，省得服主猜到底写没写进去
+                        Msg.send(sender, c.msg("prefix") + Msg.fill(c.msg("threshold-written"),
+                                "line", String.valueOf(r.line),
+                                "before", r.before.isEmpty() ? "（无）" : r.before,
+                                "after", r.after));
+                        if (r.uncommented) {
+                            Msg.send(sender, c.msg("prefix") + c.msg("threshold-uncommented"));
+                        }
+                        if (r.added) {
+                            Msg.send(sender, c.msg("prefix") + c.msg("threshold-added"));
+                        }
                     } catch (NumberFormatException e) {
                         Msg.send(sender, c.msg("prefix") + "&c阈值得是数字");
                         return true;
                     }
                 }
                 Msg.send(sender, c.msg("prefix") + Msg.fill(c.msg("threshold-set"), "threshold", String.valueOf(c.threshold)));
+                Msg.send(sender, c.msg("prefix") + c.msg("diag-config-keep"));
+                showConfigLine(sender, c);
                 return true;
             }
             case "open": {
@@ -221,6 +237,23 @@ public final class AdminCommands implements TabExecutor {
                 }
                 return true;
             }
+            case "config": {
+                VoteConfig cfg = plugin.config();
+                Msg.send(sender, cfg.msg("prefix") + Msg.fill(cfg.msg("diag-config-file"),
+                        "file", plugin.configFile().toAbsolutePath().toString()));
+                showConfigLine(sender, cfg);
+                try {
+                    long ms = java.nio.file.Files.getLastModifiedTime(plugin.configFile()).toMillis();
+                    long sec = Math.max(0, (System.currentTimeMillis() - ms) / 1000);
+                    Msg.send(sender, cfg.msg("prefix") + Msg.fill(cfg.msg("diag-config-mtime"),
+                            "ago", sec < 60 ? sec + " 秒" : (sec / 60) + " 分" + (sec % 60) + " 秒"));
+                } catch (IOException ignored) {
+                    // 读不到修改时间就算了，不影响前面的信息
+                }
+                Msg.send(sender, "&7改完文件后要 &a/votegameadmin reload &7才会重新读；"
+                        + "面板的文件编辑器会缓存，改完记得刷新再看");
+                return true;
+            }
             case "version": {
                 VoteConfig cur = plugin.config();
                 int withUuid = 0;
@@ -238,7 +271,7 @@ public final class AdminCommands implements TabExecutor {
                 return true;
             }
             default: {
-                Msg.send(sender, c.msg("prefix") + "&7用法：&a/votegameadmin reload|reset|stats|threshold <数>|open|test [url]|env|mcsm|trmenu|version");
+                Msg.send(sender, c.msg("prefix") + "&7用法：&a/votegameadmin reload|reset|stats|threshold <数>|open|test [url]|env|mcsm|trmenu|config|version");
                 return true;
             }
         }
@@ -246,7 +279,7 @@ public final class AdminCommands implements TabExecutor {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        List<String> base = Arrays.asList("reload", "reset", "stats", "threshold", "open", "test", "env", "mcsm", "trmenu", "version");
+        List<String> base = Arrays.asList("reload", "reset", "stats", "threshold", "open", "test", "env", "mcsm", "trmenu", "config", "version");
         if (args.length == 1) {
             String prefix = args[0].toLowerCase(Locale.ROOT);
             List<String> out = new ArrayList<>();
@@ -261,5 +294,37 @@ public final class AdminCommands implements TabExecutor {
             return new ArrayList<>(new Mcsm(plugin.config()).statusUrls());
         }
         return Collections.emptyList();
+    }
+
+    /**
+     * 把「插件读的那个 config.toml 里 threshold 现在写的啥」显示出来，跟内存值对一下。
+     *
+     * <p>专治"我在游戏里改了，配置文件看着没变"—— 文件在哪、那行长啥样、
+     * 插件实际读到的值是多少，三样一起摆出来。
+     */
+    private void showConfigLine(CommandSender sender, VoteConfig cfg) {
+        ConfigEdit.Found found = plugin.findThresholdLine();
+        if (found.missing()) {
+            Msg.send(sender, cfg.msg("prefix") + Msg.fill(cfg.msg("diag-config-missing"),
+                    "value", String.valueOf(cfg.threshold)));
+            return;
+        }
+        Msg.send(sender, cfg.msg("prefix") + Msg.fill(cfg.msg("diag-config-line"),
+                "line", String.valueOf(found.line),
+                "raw", found.raw));
+        if (found.commented) {
+            Msg.send(sender, cfg.msg("prefix") + Msg.fill(cfg.msg("diag-config-commented"),
+                    "value", String.valueOf(cfg.threshold)));
+            return;
+        }
+        int onDisk = Toml.integer(Toml.parse(found.raw), "threshold", -1);
+        if (onDisk == cfg.threshold) {
+            Msg.send(sender, cfg.msg("prefix") + Msg.fill(cfg.msg("diag-config-match"),
+                    "value", String.valueOf(cfg.threshold)));
+        } else {
+            Msg.send(sender, cfg.msg("prefix") + Msg.fill(cfg.msg("diag-config-mismatch"),
+                    "value", String.valueOf(cfg.threshold),
+                    "disk", String.valueOf(onDisk)));
+        }
     }
 }

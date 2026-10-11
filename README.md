@@ -35,12 +35,13 @@
 | `/votegameadmin reload` | 重载配置（⚠ 清空票数） | `minigamevote.admin`（默认 op） |
 | `/votegameadmin reset` | 重置票数 | 同上 |
 | `/votegameadmin stats` | 看票数排名（同上） | 同上 |
-| `/votegameadmin threshold <数>` | 查看 / 改阈值 | 同上 |
+| `/votegameadmin threshold <数>` | 查看 / 改阈值（**直接写回 config.toml**，不清空票数） | 同上 |
 | `/votegameadmin open` | 给全体在线玩家弹菜单 | 同上 |
 | `/votegameadmin test [url]` | 测一次 HTTP（看状态码和响应，apikey 打码） | 同上 |
 | `/votegameadmin env` | 看环境变量读到没（只显示名字，不显示值） | 同上 |
 | `/votegameadmin mcsm` | 看 MCSM 配置和拼好的地址（apikey 打码） | 同上 |
 | `/votegameadmin trmenu` | 看菜单主动刷新接上了没 | 同上 |
+| `/votegameadmin config` | 看配置文件路径、磁盘上 threshold 那行原文、插件读到的值 | 同上 |
 | `/votegameadmin version` | 看版本与运行状态 | 同上 |
 
 ## 投票菜单（TrMenu，软依赖）
@@ -117,6 +118,30 @@ TrMenu 会把图标构建出来的 `ItemStack` **按会话 id 缓存**（`Item` 
 4. 占位符里的 `<id>` 要等于 `config.toml` 里 `[games.<id>]` 的节名，
    `%minigamevote_votes_hide%` 对应 `[games.hide]`，拼错就返回空
 4. 实在不行把 `reopen-after-vote` 设成 `true`，改成投完票重开菜单（会有闪烁）
+
+## 改阈值：`/votegameadmin threshold <数>`
+
+这条命令是**直接改磁盘上的 config.toml**，不是只在内存里改一下：
+
+```
+> votegameadmin threshold 3
+[小游戏投票] 已写回 config.toml 第 21 行：threshold = 3   # 达到多少票触发开服流程
+[小游戏投票] 当前阈值：3
+[小游戏投票] 第 21 行：threshold = 3   # 达到多少票触发开服流程
+[小游戏投票] 插件读到的值：3（跟文件一致）
+```
+
+- **只改那一行**：缩进和行尾注释都留着，不会把你的配置文件重新排版
+- **那行被 `#` 注释掉了** → 就地取消注释再改值（旧版会跳过它、在文件最开头另插一行，
+  所以你在原位置看到的还是旧值）
+- **配置里压根没这一项** → 在第一个分节之前新增一行（保证是顶层）
+- **不会清空票数**：改个数字不该把大家投的票清掉；而且阈值调低后如果现有票数已经达标，
+  会立刻进入开服流程
+- 写完走**临时文件 + 原子替换**，写一半崩了也不会留下半截配置
+
+> ⚠ 面板（MCSM）的在线文件编辑器会缓存文件内容：你在游戏里改完、面板上看着还是旧的，
+> 先在编辑器里刷新一下再看。要确认插件到底读的哪个文件、文件里现在写的啥，用
+> `/votegameadmin config`。
 
 ## PlaceholderAPI（软依赖，装了才注册）
 

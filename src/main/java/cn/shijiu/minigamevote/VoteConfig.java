@@ -165,6 +165,18 @@ public final class VoteConfig {
         m.put("diag-off", "&c配置里关了");
         m.put("reloaded", "&a配置已重载（票数已清空）");
         m.put("threshold-set", "&a当前阈值：&e%threshold%");
+        m.put("threshold-written", "&a已写回 config.toml 第 &f%line% &a行：&7%after%");
+        m.put("threshold-uncommented", "&e⚠ 原来那行是注释（# 开头），已就地取消注释 —— 之前插件根本读不到它");
+        m.put("threshold-added", "&e⚠ 配置里原来没有 threshold 这一项，已在顶层新增一行");
+        m.put("threshold-write-failed", "&c写回 config.toml 失败：&f%error% &c（内存里的值也没改）");
+        m.put("diag-config-file", "&7配置文件：&f%file%");
+        m.put("diag-config-line", "&7第 &f%line% &7行：&f%raw%");
+        m.put("diag-config-missing", "&c文件里没找到 threshold 行 —— 插件在用默认值 &f%value%");
+        m.put("diag-config-commented", "&c那行被 # 注释掉了，插件读不到，用的是默认值 &f%value%");
+        m.put("diag-config-match", "&7插件读到的值：&a%value% &7（跟文件一致）");
+        m.put("diag-config-mismatch", "&7插件读到的值：&c%value% &7，文件里是 &f%disk% &7—— 跑 &a/votegameadmin reload &7重读");
+        m.put("diag-config-mtime", "&7文件最后修改：&f%ago% &7前");
+        m.put("diag-config-keep", "&7改阈值不会清空已投的票（调低后已达标的会立刻进开服流程）");
         m.put("opened-menu", "&a已为 &f%player% &a打开投票菜单");
         m.put("test-result", "&7状态码：&e%code% &7(ok=%ok%)");
         m.put("test-body", "&7响应：&f%body%");
