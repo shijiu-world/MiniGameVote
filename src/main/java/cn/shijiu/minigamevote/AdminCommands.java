@@ -28,7 +28,7 @@ public final class AdminCommands implements TabExecutor {
         VoteConfig c = plugin.config();
 
         if (args.length == 0) {
-            Msg.send(sender, c.msg("prefix") + "&7用法：&a/votegameadmin reload|reset|stats|threshold <数>|open|test [url]|env|mcsm|trmenu|config|version");
+            Msg.send(sender, c.msg("prefix") + "&7用法：&a/votegameadmin reload|reset|stats|threshold <数>|open|test [url]|env|mcsm|trmenu|ping [id]|config|version");
             return true;
         }
 
@@ -185,11 +185,17 @@ public final class AdminCommands implements TabExecutor {
                 }
                 Msg.send(sender, "&7- 算「正在跑」的状态：&f" + bs);
                 Msg.send(sender, "&7- 查询失败时：&f" + (m.errorMeansBusy ? "算占用（不开服）" : "算空闲（继续开服）"));
-                Msg.send(sender, cfg.msg("prefix") + "&7小游戏 → 实例：");
+                Msg.send(sender, "&7- 等其它实例关完：&f最多 &a" + (m.stopTimeoutMs / 1000) + " &f秒，"
+                        + "每 &a" + (m.stopPollMs / 1000) + " &f秒查一次（超时按已关闭处理）");
+                Msg.send(sender, "&7- 查子服人数：&fping 超时 &a" + m.pingTimeoutMs + " &f毫秒"
+                        + "（查不到 = 当作还有人，不会关）");
+                Msg.send(sender, cfg.msg("prefix") + "&7小游戏 → 实例 / 子服地址：");
                 for (VoteConfig.Game g : cfg.games.values()) {
                     Msg.send(sender, "&7- &f" + cfg.plainName(g.id) + " &7→ "
                             + (g.uuid.isEmpty() ? "&c没配 uuid" : g.uuid
-                            + (g.daemon.isEmpty() ? "" : " &7@ " + g.daemon)));
+                            + (g.daemon.isEmpty() ? "" : " &7@ " + g.daemon))
+                            + " &7| "
+                            + (g.address.isEmpty() ? "&c没配 address" : "&f" + g.address));
                 }
                 Msg.send(sender, cfg.msg("prefix") + "&7状态查询地址（apikey 已打码）：");
                 List<String> us = svc.statusUrls();
@@ -255,6 +261,46 @@ public final class AdminCommands implements TabExecutor {
                 }
                 return true;
             }
+            case "ping": {
+                VoteConfig cfg = plugin.config();
+                List<VoteConfig.Game> targets = new ArrayList<>();
+                if (args.length >= 2) {
+                    VoteConfig.Game one = cfg.game(args[1].toLowerCase(Locale.ROOT));
+                    if (one == null) {
+                        Msg.send(sender, cfg.msg("prefix") + Msg.fill(cfg.msg("unknown-game"), "id", args[1]));
+                        return true;
+                    }
+                    targets.add(one);
+                } else {
+                    targets.addAll(cfg.games.values());
+                }
+                Msg.send(sender, cfg.msg("prefix") + "&7正在 ping 子服（异步，最多等 "
+                        + cfg.mcsm.pingTimeoutMs + " 毫秒）：");
+                for (VoteConfig.Game g : targets) {
+                    if (g.address.isEmpty()) {
+                        Msg.send(sender, cfg.msg("prefix") + Msg.fill(cfg.msg("diag-ping-none"),
+                                "game", cfg.plainName(g.id)));
+                        continue;
+                    }
+                    final VoteConfig.Game target = g;
+                    final VoteConfig snapshot = cfg;
+                    plugin.http().async(() -> ServerPing.online(g.address, cfg.mcsm.pingTimeoutMs))
+                            .whenComplete((n, throwable) -> Bukkit.getScheduler().runTask(plugin, () -> {
+                                if (n == null) {
+                                    Msg.send(sender, snapshot.msg("prefix") + Msg.fill(snapshot.msg("diag-ping-fail"),
+                                            "game", snapshot.plainName(target.id),
+                                            "addr", target.address));
+                                } else {
+                                    Msg.send(sender, snapshot.msg("prefix") + Msg.fill(snapshot.msg("diag-ping-ok"),
+                                            "game", snapshot.plainName(target.id),
+                                            "addr", target.address,
+                                            "players", String.valueOf(n)));
+                                }
+                            }));
+                }
+                Msg.send(sender, "&7地址要填子服自己的端口，填代理端口会拿到全服总人数");
+                return true;
+            }
             case "config": {
                 VoteConfig cfg = plugin.config();
                 Msg.send(sender, cfg.msg("prefix") + Msg.fill(cfg.msg("diag-config-file"),
@@ -289,7 +335,7 @@ public final class AdminCommands implements TabExecutor {
                 return true;
             }
             default: {
-                Msg.send(sender, c.msg("prefix") + "&7用法：&a/votegameadmin reload|reset|stats|threshold <数>|open|test [url]|env|mcsm|trmenu|config|version");
+                Msg.send(sender, c.msg("prefix") + "&7用法：&a/votegameadmin reload|reset|stats|threshold <数>|open|test [url]|env|mcsm|trmenu|ping [id]|config|version");
                 return true;
             }
         }
@@ -297,7 +343,7 @@ public final class AdminCommands implements TabExecutor {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        List<String> base = Arrays.asList("reload", "reset", "stats", "threshold", "open", "test", "env", "mcsm", "trmenu", "config", "version");
+        List<String> base = Arrays.asList("reload", "reset", "stats", "threshold", "open", "test", "env", "mcsm", "trmenu", "ping", "config", "version");
         if (args.length == 1) {
             String prefix = args[0].toLowerCase(Locale.ROOT);
             List<String> out = new ArrayList<>();

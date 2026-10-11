@@ -48,6 +48,9 @@ public final class Mcsm {
     /** 查询单个实例详情 */
     private static final String PATH_DETAIL = "/api/instance";
 
+    /** 停止实例（先关掉还在跑的另一个小游戏，才能开新的） */
+    private static final String PATH_STOP = "/api/protected_instance/stop";
+
     private final VoteConfig c;
 
     public Mcsm(VoteConfig c) {
@@ -97,6 +100,27 @@ public final class Mcsm {
         p.put("uuid", g.uuid == null ? "" : g.uuid);
         p.put("daemonId", daemonOf(g));
         return url(PATH_OPEN, p);
+    }
+
+    /** 某个小游戏的「停止实例」地址 */
+    public String stopUrl(VoteConfig.Game g) {
+        LinkedHashMap<String, String> p = new LinkedHashMap<>();
+        p.put("uuid", g.uuid == null ? "" : g.uuid);
+        p.put("daemonId", daemonOf(g));
+        return url(PATH_STOP, p);
+    }
+
+    /** 单个实例的状态查询地址（等待关闭时只查那几个） */
+    public String statusUrl(VoteConfig.Game g) {
+        LinkedHashMap<String, String> p = new LinkedHashMap<>();
+        p.put("uuid", g.uuid == null ? "" : g.uuid);
+        p.put("daemonId", daemonOf(g));
+        return url(PATH_DETAIL, p);
+    }
+
+    /** 0 = 已停止，这才算「关完了」（1 = 停止中，还得再等等） */
+    public static boolean isStopped(int status) {
+        return status == 0;
     }
 
     /**

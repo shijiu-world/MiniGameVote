@@ -37,11 +37,20 @@ public final class VoteConfig {
         /** 该实例所在的守护进程 id，留空则用 [mcsm] 里的 daemon-id */
         public final String daemon;
 
-        Game(String id, String name, String uuid, String daemon) {
+        /**
+         * 子服自己的地址 {@code host:port}，用来查「里面还有没有人」。
+         *
+         * <p>⚠ 必须是<b>子服本体</b>的端口，不是代理端口 —— 填代理会拿到全服总人数。
+         * 留空 = 无法确认人数，此时按"还有人在玩"处理（不会去关它）。
+         */
+        public final String address;
+
+        Game(String id, String name, String uuid, String daemon, String address) {
             this.id = id;
             this.name = name;
             this.uuid = uuid;
             this.daemon = daemon;
+            this.address = address;
         }
     }
 
@@ -74,8 +83,18 @@ public final class VoteConfig {
         /** 除小游戏实例外，还要算作"占用"的实例 uuid */
         public final List<String> watch;
 
+        /** 发关闭请求后，等多久算「已经关了」（毫秒）。超时就按已关闭处理，继续开下一个 */
+        public final long stopTimeoutMs;
+
+        /** 等待关闭期间，每隔多久查一次实例状态（毫秒） */
+        public final long stopPollMs;
+
+        /** 查子服人数的超时（毫秒）；查不到 = 不知道有多少人，按"有人"处理 */
+        public final long pingTimeoutMs;
+
         McsmSection(boolean enabled, String url, String daemonId, String apikey,
-                    Set<Integer> busyStatus, boolean errorMeansBusy, List<String> watch) {
+                    Set<Integer> busyStatus, boolean errorMeansBusy, List<String> watch,
+                    long stopTimeoutMs, long stopPollMs, long pingTimeoutMs) {
             this.enabled = enabled;
             this.url = url;
             this.daemonId = daemonId;
@@ -83,6 +102,9 @@ public final class VoteConfig {
             this.busyStatus = busyStatus;
             this.errorMeansBusy = errorMeansBusy;
             this.watch = watch;
+            this.stopTimeoutMs = stopTimeoutMs;
+            this.stopPollMs = stopPollMs;
+            this.pingTimeoutMs = pingTimeoutMs;
         }
     }
 
@@ -153,6 +175,13 @@ public final class VoteConfig {
         m.put("threshold-reached", "&f%game% &e达到 &c%threshold% &e票，正在开启…（HTTP %code%）");
         m.put("open-failed", "&f%game% &e达到 &c%threshold% &e票，但开启请求失败（HTTP %code%），票数已重置");
         m.put("busy", "&c已经有小游戏正在进行中（%detail%），本轮投票作废，票数已重置！");
+        m.put("self-running", "&e%game% &c已经在进行了 —— 本轮投票作废，票数已重置");
+        m.put("other-occupied", "&c%other% &e还在进行，而且里面还有 &a%players% &e人在玩 —— 本轮投票作废，票数已重置");
+        m.put("other-unknown", "&c%other% &e还在进行，但查不到里面的人数（没配 address 或 ping 不通），不敢擅自关服 —— 本轮投票作废，票数已重置");
+        m.put("closing-others", "&e%game% &a达到 &c%threshold% &a票；&c%other% &e已经没人了，正在关闭…");
+        m.put("stop-failed", "&c关闭 &f%other% &c的请求失败了（HTTP %code%），继续等待…");
+        m.put("others-closed", "&a%other% &7已全部关闭，正在开启 &f%game%&7…");
+        m.put("close-timeout", "&e等 &f%other% &e关闭超时（%seconds% 秒），按已关闭处理，继续开启 &f%game%");
         m.put("no-uuid", "&f%game% &e达到 &c%threshold% &e票，但该小游戏没配实例 uuid（或 MCSM 已关闭），仅重置票数");
         m.put("reset", "&a已重置所有票数与投票记录");
         m.put("diag-trmenu", "&7菜单主动刷新：%state% &7（菜单 &f%menu%&7，auto-refresh=%auto%）");
@@ -180,6 +209,9 @@ public final class VoteConfig {
         m.put("opened-menu", "&a已为 &f%player% &a打开投票菜单");
         m.put("test-result", "&7状态码：&e%code% &7(ok=%ok%)");
         m.put("test-body", "&7响应：&f%body%");
+        m.put("diag-ping-ok", "&7- &f%game% &7(%addr%)：&a%players% &7人");
+        m.put("diag-ping-fail", "&7- &f%game% &7(%addr%)：&c查不到（连不上 / 超时 / 地址写错）");
+        m.put("diag-ping-none", "&7- &f%game% &7：&c没配 address（查不到人数 → 不会被关）");
         m.put("test-probe", "&7读到的实例状态：&f%list%");
         m.put("test-probe-bad", "&c读不出实例状态：&f%reason% &7（uuid 不对？没权限？看上面的响应原文）");
         DEFAULT_MESSAGES = Collections.unmodifiableMap(m);
@@ -239,7 +271,8 @@ public final class VoteConfig {
             String name = Toml.string(t, "games." + id + ".name", id);
             String uuid = env(Toml.string(t, "games." + id + ".uuid", ""), envNames, envMissing).trim();
             String daemon = env(Toml.string(t, "games." + id + ".daemon-id", ""), envNames, envMissing).trim();
-            games.put(id, new Game(id, name, uuid, daemon));
+            String address = env(Toml.string(t, "games." + id + ".address", ""), envNames, envMissing).trim();
+            games.put(id, new Game(id, name, uuid, daemon, address));
         }
 
         // ② MCSManager：开/查面板上的实例
@@ -257,7 +290,11 @@ public final class VoteConfig {
                 env(Toml.string(t, "mcsm.apikey", ""), envNames, envMissing).trim(),
                 intSet(Toml.list(t, "mcsm.busy-status"), 2, 3),
                 "busy".equalsIgnoreCase(Toml.string(t, "mcsm.on-query-error", "idle")),
-                watch
+                watch,
+                // 等其它实例关完的超时（默认 5 分钟）与轮询间隔（默认 3 秒）
+                Math.max(1000L, Toml.integer(t, "mcsm.stop-timeout-ms", 300000)),
+                Math.max(500L, Toml.integer(t, "mcsm.stop-poll-ms", 3000)),
+                Math.max(200L, Toml.integer(t, "mcsm.ping-timeout-ms", 1500))
         );
 
         Http http = new Http(

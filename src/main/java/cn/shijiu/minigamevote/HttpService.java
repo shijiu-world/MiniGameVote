@@ -62,6 +62,16 @@ public final class HttpService {
         return CompletableFuture.supplyAsync(() -> doRequest(url, method, body, timeoutMs, userAgent, headers), pool);
     }
 
+    /**
+     * 在同一个池子上跑一个阻塞任务（查子服人数用）。
+     *
+     * <p>ping 是同步 socket，必须放异步线程；复用这个池子省得再开一个。
+     * ⚠ 别拿它发 HTTP 请求 —— 那是 {@link #request} 的活，两个都占线程池会互相饿死。
+     */
+    public <T> CompletableFuture<T> async(java.util.function.Supplier<T> task) {
+        return CompletableFuture.supplyAsync(task, pool);
+    }
+
     private Result doRequest(String url, String method, String body, long timeoutMs, String userAgent,
                              Map<String, String> headers) {
         try {

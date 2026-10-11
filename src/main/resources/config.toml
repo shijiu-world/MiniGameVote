@@ -53,37 +53,51 @@ busy-status = [2, 3]          # 哪些状态码算「有小游戏在跑」→ �
 on-query-error = "busy"       # 查不到时：idle 当空闲继续开 / busy 当占用作废（更保守）
 watch = []                    # 除小游戏外，还有哪些实例在跑也算占用；一般留空
 
+# 换游戏：别的游戏还在跑、但里面没人时，先关掉它再开新的
+stop-timeout-ms = 300000      # 等它关完最多等多久（毫秒，默认 5 分钟）；超时按「已关闭」继续
+stop-poll-ms = 3000           # 等待期间每隔多久查一次状态（毫秒）
+ping-timeout-ms = 1500        # 查子服人数的超时（毫秒）；查不到 = 不敢关，本轮作废
+
 
 # ───────────────────────────────── 小游戏 ───────────────────────────────────
 #  每节一个小游戏，节名 [games.<id>] 里的 id 就是 /votegame <id> 用的那个
 #    name      显示名，支持 & 颜色码
 #    uuid      面板实例 uuid（必填）— 面板 → 打开实例 → 地址栏那串 32 位十六进制
 #    daemon-id 可选，该实例不在 [mcsm] 的默认守护上时才写
+#    address   子服地址 host:port —— 用来查「里面还有没有人」
+#              ⚠ 填子服自己的端口，别填代理端口（代理返回的是全服总人数）
+#              留空 = 查不到人数 → 保守当作「还有人在玩」，不会去关它
 # ────────────────────────────────────────────────────────────────────────────
 
 [games.hide]
 name = "&b躲猫猫"
 uuid = "实例uuid"
+address = "127.0.0.1:2051"
 
 [games.tntrun]
 name = "&cTNTRun"
 uuid = "实例uuid"
+address = "127.0.0.1:2052"
 
 [games.bedwars]
 name = "&e起床战争"
 uuid = "实例uuid"
+address = "127.0.0.1:2053"
 
 [games.murder]
 name = "&a谁是杀手"
 uuid = "实例uuid"
+address = "127.0.0.1:2054"
 
 [games.parkour]
 name = "&d跑酷"
 uuid = "实例uuid"
+address = "127.0.0.1:2055"
 
 [games.quake]
 name = "&6QUAKE"
 uuid = "实例uuid"
+address = "127.0.0.1:2056"
 
 # ───────────────────────────────── 网络 ─────────────────────────────────────
 
@@ -156,6 +170,13 @@ stats-none = "&7还没有人投票"
 threshold-reached = "&f%game% &e达到 &c%threshold% &e票，正在开启…"
 open-failed = "&f%game% &e达到 &c%threshold% &e票，但开启请求失败，票数已重置"
 busy = "&c已经有小游戏正在进行中，本轮投票作废！"
+self-running = "&e%game% &c已经在进行了 —— 本轮投票作废，票数已重置"
+other-occupied = "&c%other% &e还在进行，而且里面还有 &a%players% &e人在玩 —— 本轮投票作废，票数已重置"
+other-unknown = "&c%other% &e还在进行，但查不到里面的人数，不敢擅自关服 —— 本轮投票作废，票数已重置"
+closing-others = "&e%game% &a达到 &c%threshold% &a票；&c%other% &e已经没人了，正在关闭…"
+stop-failed = "&c关闭 &f%other% &c的请求失败了（HTTP %code%），继续等待…"
+others-closed = "&a%other% &7已全部关闭，正在开启 &f%game%&7…"
+close-timeout = "&e等 &f%other% &e关闭超时（%seconds% 秒），按已关闭处理，继续开启 &f%game%"
 no-uuid = "&f%game% &e达到 &c%threshold% &e票，但该小游戏没配实例 uuid（或 MCSM 已关闭），仅重置票数"
 
 reset = "&a已重置所有票数与投票记录"

@@ -144,6 +144,22 @@ public final class MiniGameVote extends JavaPlugin {
             if (noUuid > 0) {
                 getLogger().warning("有 " + noUuid + " 个小游戏没配实例 uuid —— 投到它达标时无法开启");
             }
+            // address 决定是否敢关掉"还在跑但没人"的小游戏，配漏了只影响换游戏，不影响开服
+            int noAddr = 0;
+            for (VoteConfig.Game g : config.games.values()) {
+                if (g.address.isEmpty()) {
+                    noAddr++;
+                    continue;
+                }
+                if (ServerPing.parse(g.address) == null) {
+                    getLogger().warning("小游戏 " + g.id + " 的 address \"" + g.address
+                            + "\" 格式不对（应为 host:port）");
+                }
+            }
+            if (noAddr > 0) {
+                getLogger().info("有 " + noAddr + " 个小游戏没配 address —— 它在跑的时候查不到人数，"
+                        + "不会被自动关闭（只会作废本轮投票）");
+            }
             for (Map.Entry<String, Integer> e : seen.entrySet()) {
                 if (e.getValue() > 1) {
                     getLogger().warning("实例 uuid " + e.getKey() + " 被 " + e.getValue()
