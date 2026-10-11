@@ -124,7 +124,7 @@ vote-success = "&a你投给了 &f%game% &a（%votes%/%threshold%）"
 # 已经投过的再投别的 → 改票，上一票自动取消；%old% 是他原来投的那个
 vote-changed = "&a你改投给了 &f%game% &a（%votes%/%threshold%）"
 already-voted = "&c你当前已经投给 &f%game%&c 了"
-vote-cancelled = "&a已取消你投给 &f%game% &a的那一票，可以重新投一个"
+vote-cancelled = "&a已取消投给 &f%game% &a的票数"
 cancel-none = "&c你还没有投过票，没什么可取消的"
 unknown-game = "&c未知的小游戏：&f%id%"
 progress = "&7%player% &f投给了 &e%game% &7（%votes%/%threshold%）"
