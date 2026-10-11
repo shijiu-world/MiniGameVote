@@ -1,0 +1,217 @@
+package cn.shijiu.minigamevote;
+
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * MCSManager 接口的拼装与解读。
+ *
+ * <p>只对接当前版本 MCSManager，用到的两个接口
+ * （见 https://docs.mcsmanager.com/zh_cn/apis/api_instance.html）：
+ * <ul>
+ *   <li><b>开实例</b>：{@code GET /api/protected_instance/open?uuid=&daemonId=}</li>
+ *   <li><b>查状态</b>：{@code GET /api/instance?uuid=&daemonId=}，每个小游戏实例查一次</li>
+ * </ul>
+ * 认证统一走 {@code Authorization: Bearer <apikey>} 请求头。
+ *
+ * <p>状态码含义（文档里的 InstanceDetail.status）：
+ * <pre>
+ *   -1 忙碌 / 0 停止 / 1 停止中 / 2 启动中 / 3 运行中
+ * </pre>
+ * 默认把「启动中」和「运行中」都算作"有小游戏在跑"，所以投票作废。
+ *
+ * <p>⚠ 路径与认证方式写死在这里，不提供配置开关：老版本面板的兼容分支已移除。
+ * 逐个查而不是"一次列全部"，是因为 {@code /api/instance} 是最基础的接口，
+ * 不依赖分页列表（列表接口的路径名在面板版本间变过），而且单个实例查失败
+ * 不影响其它实例，配合 {@code on-query-error} 更稳。
+ */
+public final class Mcsm {
+
+    /** 启动实例 */
+    private static final String PATH_OPEN = "/api/protected_instance/open";
+
+    /** 查询单个实例详情 */
+    private static final String PATH_DETAIL = "/api/instance";
+
+    private final VoteConfig c;
+
+    public Mcsm(VoteConfig c) {
+        this.c = c;
+    }
+
+    // ------------------------------------------------------------------
+    // 地址
+    // ------------------------------------------------------------------
+
+    private String url(String path, LinkedHashMap<String, String> params) {
+        StringBuilder sb = new StringBuilder(c.mcsm.url.trim());
+        while (sb.length() > 0 && sb.charAt(sb.length() - 1) == '/') {
+            sb.setLength(sb.length() - 1);
+        }
+        sb.append(path.startsWith("/") ? path : "/" + path);
+        if (params.isEmpty()) {
+            return sb.toString();
+        }
+        sb.append('?');
+        boolean first = true;
+        for (Map.Entry<String, String> e : params.entrySet()) {
+            if (!first) {
+                sb.append('&');
+            }
+            first = false;
+            sb.append(enc(e.getKey())).append('=').append(enc(e.getValue()));
+        }
+        return sb.toString();
+    }
+
+    private static String enc(String s) {
+        try {
+            return URLEncoder.encode(s == null ? "" : s, StandardCharsets.UTF_8.name());
+        } catch (UnsupportedEncodingException e) {
+            return s == null ? "" : s;
+        }
+    }
+
+    /** 某个小游戏的「启动实例」地址 */
+    public String openUrl(VoteConfig.Game g) {
+        LinkedHashMap<String, String> p = new LinkedHashMap<>();
+        p.put("uuid", g.uuid == null ? "" : g.uuid);
+        p.put("daemonId", daemonOf(g));
+        return url(PATH_OPEN, p);
+    }
+
+    /**
+     * 查状态用的地址：每个配了 uuid 的小游戏一条，**去重**。
+     *
+     * <p>去重是必要的：配置模板里 6 个游戏的 uuid 都是同一个占位值，服主没改全的话
+     * 不去重就会拿同一个假 uuid 查 6 次，白白多花 6 个请求。
+     */
+    public List<String> statusUrls() {
+        List<String> out = new ArrayList<>();
+        for (VoteConfig.Game g : c.games.values()) {
+            if (g.uuid == null || g.uuid.isEmpty()) {
+                continue;
+            }
+            LinkedHashMap<String, String> p = new LinkedHashMap<>();
+            p.put("uuid", g.uuid);
+            p.put("daemonId", daemonOf(g));
+            String u = url(PATH_DETAIL, p);
+            if (!out.contains(u)) {
+                out.add(u);
+            }
+        }
+        return out;
+    }
+
+    /** 看着不像 MCSM 实例 uuid（32 位十六进制）就返回 false */
+    public static boolean looksLikeUuid(String s) {
+        return s != null && s.matches("(?i)[0-9a-f]{32}");
+    }
+
+    private String daemonOf(VoteConfig.Game g) {
+        String d = g.daemon;
+        if (d == null || d.isEmpty()) {
+            d = c.mcsm.daemonId;
+        }
+        return d == null ? "" : d;
+    }
+
+    /** 认证头；apikey 没读到就返回空（宁可不认证，也不把空串塞进头里） */
+    public Map<String, String> authHeaders() {
+        Map<String, String> h = new LinkedHashMap<>();
+        if (!c.mcsm.apikey.isEmpty()) {
+            h.put("Authorization", "Bearer " + c.mcsm.apikey);
+        }
+        return h;
+    }
+
+    // ------------------------------------------------------------------
+    // 响应解读
+    // ------------------------------------------------------------------
+
+    /** 需要盯着的实例：所有小游戏实例 + 配置里额外写的 uuid */
+    public Set<String> watched() {
+        Set<String> out = new LinkedHashSet<>();
+        for (VoteConfig.Game g : c.games.values()) {
+            if (g.uuid != null && !g.uuid.isEmpty()) {
+                out.add(g.uuid);
+            }
+        }
+        out.addAll(c.mcsm.watch);
+        return out;
+    }
+
+    /**
+     * 从响应里读出「实例 uuid → 状态码」。
+     * 现在是逐个查 {@code /api/instance}，正常只会有单条结构；数组结构一并认，
+     * 纯粹是为了面板哪天换了返回形态不至于整段解析失败。
+     * <pre>
+     *   单条：{ "status":200, "data": { "instanceUuid":"x", "status":3 } }
+     *   列表：{ "status":200, "data": { "data": [ { "instanceUuid":"x", "status":3 } ] } }
+     * </pre>
+     * ⚠ 顶层那个 "status":200 是 HTTP 层的状态码，别拿它当实例状态——必须从 data 里取。
+     */
+    public Map<String, Integer> parseStatuses(String body) {
+        Map<String, Integer> out = new LinkedHashMap<>();
+        Object root = Json.parse(body);
+        if (root == null) {
+            return out;
+        }
+        List<Object> arr = Json.array(Json.at(root, "data.data"));
+        if (arr != null) {
+            for (Object item : arr) {
+                put(out, item);
+            }
+            return out;
+        }
+        put(out, Json.at(root, "data"));
+        return out;
+    }
+
+    private void put(Map<String, Integer> out, Object item) {
+        if (!(item instanceof Map)) {
+            return;
+        }
+        String uuid = Json.str(Json.at(item, "instanceUuid"));
+        Integer st = Json.integer(Json.at(item, "status"));
+        if (uuid != null && !uuid.isEmpty() && st != null) {
+            out.put(uuid, st);
+        }
+    }
+
+    /** 这个实例算不算「正在跑」（只看被盯着的实例，状态码在 busy-status 里） */
+    public boolean isBusy(String uuid, Integer status) {
+        if (uuid == null || status == null) {
+            return false;
+        }
+        return watched().contains(uuid) && c.mcsm.busyStatus.contains(status);
+    }
+
+    /** uuid → 小游戏显示名，用来把「哪个实例在跑」说人话 */
+    public String displayName(String uuid) {
+        for (VoteConfig.Game g : c.games.values()) {
+            if (uuid.equals(g.uuid)) {
+                return c.plainName(g.id);
+            }
+        }
+        return uuid;
+    }
+
+    public static String statusText(int s) {
+        switch (s) {
+            case -1: return "忙碌";
+            case 0: return "停止";
+            case 1: return "停止中";
+            case 2: return "启动中";
+            case 3: return "运行中";
+            default: return "未知(" + s + ")";
+        }
+    }
+}

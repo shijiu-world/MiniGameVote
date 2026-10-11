@@ -1,0 +1,5 @@
+# 统一换行，避免 Windows 提交把 shell 脚本转成 CRLF 导致 CI 跑不起来
+* text=auto eol=lf
+
+*.jar binary
+*.png binary

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  这个 pom 给 GitHub Actions（.github/workflows/release.yml）用：打 v* tag 就构建并挂 Release。
+
+  本机构建走 ./build.sh（javac + jar，离线，不联网）。
+  两边都从这里的 <version> 取版本号：
+    - plugin.yml 的 version 写成 ${project.version}，由 resources filtering 替换
+    - build.sh 也从这个文件里读，所以改版本只改这一处
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>cn.shijiu</groupId>
+    <artifactId>minigamevote</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>MiniGameVote</name>
+    <description>大厅小游戏投票：/votegame 打开 TrMenu 菜单投票，达标后异步发 HTTP 开启小游戏</description>
+
+    <properties>
+        <!-- release 17：class 61，1.17+ 的服务端都能加载 -->
+        <java.version>17</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <build>
+        <finalName>MiniGameVote-${project.version}</finalName>
+        <resources>
+            <!-- 只有 plugin.yml 需要替换 ${project.version}。
+                 ⚠ config.toml 绝不能走 filtering：里面有 ${main} 这类域名变量，
+                    会被 Maven 当成属性替换掉（替换成空或原样报错）。 -->
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>plugin.yml</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>plugin.yml</exclude>
+                </excludes>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.8.1</version>
+                <configuration>
+                    <release>${java.version}</release>
+                    <encoding>UTF-8</encoding>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <repositories>
+        <repository>
+            <id>papermc-repo</id>
+            <url>https://repo.papermc.io/repository/maven-public/</url>
+        </repository>
+        <repository>
+            <id>placeholderapi</id>
+            <url>https://repo.extendedclip.com/content/repositories/placeholderapi/</url>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <!-- provided：运行时由服务端提供，不打进产物 -->
+        <dependency>
+            <groupId>io.papermc.paper</groupId>
+            <artifactId>paper-api</artifactId>
+            <version>1.21.4-R0.1-SNAPSHOT</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- 软依赖：菜单里有 PlaceholderAPI 就用，没有就不注册扩展 -->
+        <dependency>
+            <groupId>me.clip</groupId>
+            <artifactId>placeholderapi</artifactId>
+            <version>2.11.6</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

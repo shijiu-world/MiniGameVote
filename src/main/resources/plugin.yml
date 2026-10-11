@@ -1,0 +1,27 @@
+name: MiniGameVote
+version: ${project.version}
+main: cn.shijiu.minigamevote.MiniGameVote
+api-version: 1.21
+author: 拾玖世界
+description: 小游戏投票 - /votegame 打开菜单投票，达标后异步发 HTTP 开启小游戏
+softdepend: [PlaceholderAPI, TrMenu]
+
+commands:
+  votegame:
+    description: 打开小游戏投票菜单 / 给某个小游戏投票
+    usage: /votegame [<小游戏id>|stats]
+    aliases: [vg]
+  votegameadmin:
+    description: 小游戏投票管理
+    usage: /votegameadmin reload|reset|stats|threshold <数>|open|test <url>|env|mcsm|version
+    permission: minigamevote.admin
+    permission-message: '&c你没有管理权限'
+    aliases: [vga]
+
+permissions:
+  minigamevote.vote:
+    description: 允许参与小游戏投票
+    default: true
+  minigamevote.admin:
+    description: 允许管理投票（重载/重置/改阈值/测试接口）
+    default: op

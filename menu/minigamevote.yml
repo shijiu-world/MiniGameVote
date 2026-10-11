@@ -1,0 +1,142 @@
+title: '&6&l小游戏投票 &7| &e%player_name%'
+rows: 3
+
+layout:
+  - '#########'
+  - '#ABCDEF#'
+  - '#I#####H#'
+
+events:
+  open:
+    - condition: ''
+      actions:
+        - 'sound: block.note_block.bit-2-2'
+
+icons:
+  '#':
+    display:
+      material: GRAY_STAINED_GLASS_PANE
+      name: '&6&l小游戏投票'
+      lore:
+        - '&7点一个你想玩的小游戏，投出一票'
+        - '&7满 &e%minigamevote_threshold% &7票自动开启'
+        - '&7退出服务器后你投的票会作废'
+    actions:
+      all: []
+
+  A:
+    display:
+      material: PINK_WOOL
+      name: '&b躲猫猫'
+      lore:
+        - '&7经典躲猫猫，躲好了别被发现'
+        - ''
+        - '&7当前票数：&e%minigamevote_votes_hide% &7/ &e%minigamevote_threshold%'
+        - ''
+        - '&a▶ 点击投票'
+    actions:
+      all:
+        - 'player: votegame hide'
+        - 'sound: entity.item.pickup'
+
+  B:
+    display:
+      material: TNT
+      name: '&cTNTRun'
+      lore:
+        - '&7脚下的方块会消失，别停下'
+        - ''
+        - '&7当前票数：&e%minigamevote_votes_tntrun% &7/ &e%minigamevote_threshold%'
+        - ''
+        - '&a▶ 点击投票'
+    actions:
+      all:
+        - 'player: votegame tntrun'
+        - 'sound: entity.item.pickup'
+
+  C:
+    display:
+      material: RED_BED
+      name: '&e起床战争'
+      lore:
+        - '&7拆床！守住自己的床'
+        - ''
+        - '&7当前票数：&e%minigamevote_votes_bedwars% &7/ &e%minigamevote_threshold%'
+        - ''
+        - '&a▶ 点击投票'
+    actions:
+      all:
+        - 'player: votegame bedwars'
+        - 'sound: entity.item.pickup'
+
+  D:
+    display:
+      material: IRON_SWORD
+      name: '&a谁是杀手'
+      lore:
+        - '&7找出身边的杀手'
+        - ''
+        - '&7当前票数：&e%minigamevote_votes_murder% &7/ &e%minigamevote_threshold%'
+        - ''
+        - '&a▶ 点击投票'
+    actions:
+      all:
+        - 'player: votegame murder'
+        - 'sound: entity.item.pickup'
+
+  E:
+    display:
+      material: DIAMOND_BOOTS
+      name: '&d跑酷'
+      lore:
+        - '&7跳就完事了'
+        - ''
+        - '&7当前票数：&e%minigamevote_votes_parkour% &7/ &e%minigamevote_threshold%'
+        - ''
+        - '&a▶ 点击投票'
+    actions:
+      all:
+        - 'player: votegame parkour'
+        - 'sound: entity.item.pickup'
+
+  F:
+    display:
+      material: DIAMOND_HOE
+      name: '&6QUAKE'
+      lore:
+        - '&7一枪一个的枪战'
+        - ''
+        - '&7当前票数：&e%minigamevote_votes_quake% &7/ &e%minigamevote_threshold%'
+        - ''
+        - '&a▶ 点击投票'
+    actions:
+      all:
+        - 'player: votegame quake'
+        - 'sound: entity.item.pickup'
+
+  I:
+    display:
+      material: 'head:%player_name%'
+      name: '&b%player_name% &6的投票'
+      lore:
+        - '&7你当前投给：&f%minigamevote_mine%'
+        - '&7每人一票，退出服务器即作废'
+        - ''
+        - '&7当前最多票：&e%minigamevote_leading%'
+        - '&7已投票人数：&e%minigamevote_total%'
+        - ''
+        - '&7查看全部票数：&a/votegame stats'
+    actions:
+      all:
+        - 'player: votegame stats'
+        - 'sound: entity.item.pickup'
+
+  H:
+    display:
+      material: BARRIER
+      name: '&c关闭菜单'
+      lore:
+        - '&7指令：&a/votegame'
+    actions:
+      all:
+        - 'close'

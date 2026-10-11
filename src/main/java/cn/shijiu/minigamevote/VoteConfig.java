@@ -1,0 +1,350 @@
+package cn.shijiu.minigamevote;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * config.toml 的内存快照。每次 /votegameadmin reload 重新解析一份。
+ *
+ * <p>⚠ 开启方式只有一种：调 MCSManager 面板接口启动实例。
+ * 早期那套「自己写个状态接口、用 status-match 匹配响应文本」的通用 HTTP 方案已删除——
+ * 状态判定现在统一看 MCSM 返回的实例状态码（见 {@code mcsm.busy-status}）。
+ */
+public final class VoteConfig {
+
+    /** &a / &#RRGGBB 这类颜色码，取纯文本时去掉 */
+    private static final Pattern COLOR_CODE = Pattern.compile("(?i)&(#[0-9a-f]{6}|[0-9a-fk-or])");
+
+    /** ${env:NAME} 或 ${env:NAME:-默认值} */
+    private static final Pattern ENV_TOKEN = Pattern.compile("\\$\\{env:([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\\}");
+
+    public static final class Game {
+        public final String id;
+        public final String name;
+
+        /** MCSManager 实例 uuid：达标后就是启动这个实例 */
+        public final String uuid;
+
+        /** 该实例所在的守护进程 id，留空则用 [mcsm] 里的 daemon-id */
+        public final String daemon;
+
+        Game(String id, String name, String uuid, String daemon) {
+            this.id = id;
+            this.name = name;
+            this.uuid = uuid;
+            this.daemon = daemon;
+        }
+    }
+
+    /** 每投一票的播报范围 */
+    public enum Audience {
+        /** 只发给已经投过票的玩家（默认）：没投票的人不被打扰 */
+        VOTERS,
+        /** 全服广播 */
+        ALL,
+        /** 不播报 */
+        NONE
+    }
+
+    /**
+     * [mcsm]：直接调 MCSManager 面板接口开/查实例。
+     *
+     * <p>路径与认证方式写死在 {@link Mcsm} 里（只对接当前版本面板），
+     * 这里只留真正需要服主填的东西。
+     */
+    public static final class McsmSection {
+        public final boolean enabled;
+        public final String url;
+        public final String daemonId;
+        public final String apikey;
+        public final Set<Integer> busyStatus;
+
+        /** 查询失败（超时/连不上）时算空闲还是算占用 */
+        public final boolean errorMeansBusy;
+
+        /** 除小游戏实例外，还要算作"占用"的实例 uuid */
+        public final List<String> watch;
+
+        McsmSection(boolean enabled, String url, String daemonId, String apikey,
+                    Set<Integer> busyStatus, boolean errorMeansBusy, List<String> watch) {
+            this.enabled = enabled;
+            this.url = url;
+            this.daemonId = daemonId;
+            this.apikey = apikey;
+            this.busyStatus = busyStatus;
+            this.errorMeansBusy = errorMeansBusy;
+            this.watch = watch;
+        }
+    }
+
+    /** [http]：和面板通信的网络参数（不论查状态还是开实例都走这里） */
+    public static final class Http {
+        public final int timeoutMs;
+        public final String userAgent;
+
+        Http(int timeoutMs, String userAgent) {
+            this.timeoutMs = timeoutMs;
+            this.userAgent = userAgent;
+        }
+    }
+
+    public static final class Menu {
+        public final boolean enabled;
+        public final String openCommand;
+        public final boolean reopenAfterVote;
+
+        Menu(boolean enabled, String openCommand, boolean reopenAfterVote) {
+            this.enabled = enabled;
+            this.openCommand = openCommand;
+            this.reopenAfterVote = reopenAfterVote;
+        }
+    }
+
+    /** 配置里缺项时的兜底文案，避免服主删了某行就 NPE。 */
+    private static final Map<String, String> DEFAULT_MESSAGES;
+
+    static {
+        Map<String, String> m = new LinkedHashMap<>();
+        m.put("prefix", "&6[小游戏投票] &r");
+        m.put("vote-success", "&a你投给了 &f%game% &a（%votes%/%threshold%）");
+        m.put("already-voted", "&c你已经投过票了（当前投给 &f%game%&c）");
+        m.put("unknown-game", "&c未知的小游戏：&f%id%");
+        m.put("progress", "&7%player% &f投给了 &e%game% &7（%votes%/%threshold%）");
+        m.put("no-permission", "&c你没有投票权限");
+        m.put("usage", "&7用法：&a/votegame &7打开菜单，&a/votegame <id> &7直接投票");
+        m.put("stats-header", "&6========== 小游戏投票 ==========");
+        m.put("stats-line", "&7- &f%game% &7：&e%votes%&7/&e%threshold%");
+        m.put("stats-total", "&7已投票人数：&e%total%");
+        m.put("stats-none", "&7还没有人投票");
+        m.put("threshold-reached", "&f%game% &e达到 &c%threshold% &e票，正在开启…（HTTP %code%）");
+        m.put("open-failed", "&f%game% &e达到 &c%threshold% &e票，但开启请求失败（HTTP %code%），票数已重置");
+        m.put("busy", "&c已经有小游戏正在进行中（%detail%），本轮投票作废，票数已重置！");
+        m.put("no-uuid", "&f%game% &e达到 &c%threshold% &e票，但该小游戏没配实例 uuid（或 MCSM 已关闭），仅重置票数");
+        m.put("reset", "&a已重置所有票数与投票记录");
+        m.put("reloaded", "&a配置已重载（票数已清空）");
+        m.put("threshold-set", "&a当前阈值：&e%threshold%");
+        m.put("opened-menu", "&a已为 &f%player% &a打开投票菜单");
+        m.put("test-result", "&7状态码：&e%code% &7(ok=%ok%)");
+        m.put("test-body", "&7响应：&f%body%");
+        DEFAULT_MESSAGES = Collections.unmodifiableMap(m);
+    }
+
+    public final int threshold;
+    public final LinkedHashMap<String, Game> games;
+    public final Http http;
+    public final McsmSection mcsm;
+    public final Menu menu;
+    public final Audience audience;
+    public final String soundVote;
+    public final String soundDenied;
+
+    /** 配置里引用到的环境变量名（只存名字，不存值） */
+    public final Set<String> envNames;
+
+    /** 引用了但系统里没设置的环境变量名 */
+    public final Set<String> envMissing;
+
+    private final Map<String, String> messages;
+
+    private VoteConfig(int threshold, LinkedHashMap<String, Game> games,
+                       Http http, McsmSection mcsm, Menu menu, Audience audience,
+                       String soundVote, String soundDenied,
+                       Map<String, String> messages,
+                       Set<String> envNames, Set<String> envMissing) {
+        this.threshold = threshold;
+        this.games = games;
+        this.http = http;
+        this.mcsm = mcsm;
+        this.menu = menu;
+        this.audience = audience;
+        this.soundVote = soundVote;
+        this.soundDenied = soundDenied;
+        this.messages = messages;
+        this.envNames = envNames;
+        this.envMissing = envMissing;
+    }
+
+    /** @param t Toml.parse() 出来的扁平表 */
+    public static VoteConfig load(Map<String, Object> t) {
+        Set<String> envNames = new LinkedHashSet<>();
+        Set<String> envMissing = new LinkedHashSet<>();
+
+        // ① 小游戏：所有 games.<id>.name 各算一个
+        LinkedHashMap<String, Game> games = new LinkedHashMap<>();
+        for (String key : t.keySet()) {
+            if (!key.startsWith("games.") || !key.endsWith(".name")) {
+                continue;
+            }
+            String id = key.substring("games.".length(), key.length() - ".name".length());
+            if (id.isEmpty() || id.contains(".")) {
+                continue;
+            }
+            id = id.toLowerCase(Locale.ROOT);
+            String name = Toml.string(t, "games." + id + ".name", id);
+            String uuid = env(Toml.string(t, "games." + id + ".uuid", ""), envNames, envMissing).trim();
+            String daemon = env(Toml.string(t, "games." + id + ".daemon-id", ""), envNames, envMissing).trim();
+            games.put(id, new Game(id, name, uuid, daemon));
+        }
+
+        // ② MCSManager：开/查面板上的实例
+        List<String> watch = new ArrayList<>();
+        for (String w : Toml.list(t, "mcsm.watch")) {
+            String v = env(w.trim(), envNames, envMissing);
+            if (!v.isEmpty()) {
+                watch.add(v);
+            }
+        }
+        McsmSection mcsm = new McsmSection(
+                Toml.bool(t, "mcsm.enabled", true),
+                env(Toml.string(t, "mcsm.url", ""), envNames, envMissing).trim(),
+                env(Toml.string(t, "mcsm.daemon-id", ""), envNames, envMissing).trim(),
+                env(Toml.string(t, "mcsm.apikey", ""), envNames, envMissing).trim(),
+                intSet(Toml.list(t, "mcsm.busy-status"), 2, 3),
+                "busy".equalsIgnoreCase(Toml.string(t, "mcsm.on-query-error", "idle")),
+                watch
+        );
+
+        Http http = new Http(
+                Math.max(500, Toml.integer(t, "http.timeout-ms", 3000)),
+                Toml.string(t, "http.user-agent", "ShijiuWorld-MiniGameVote")
+        );
+
+        Menu menu = new Menu(
+                Toml.bool(t, "menu.enabled", true),
+                env(Toml.string(t, "menu.open-command", "trm open minigamevote %player%"), envNames, envMissing),
+                Toml.bool(t, "menu.reopen-after-vote", true)
+        );
+
+        Map<String, String> messages = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> e : t.entrySet()) {
+            String key = e.getKey();
+            if (key.startsWith("messages.") && e.getValue() != null) {
+                messages.put(key.substring("messages.".length()), String.valueOf(e.getValue()));
+            }
+        }
+
+        return new VoteConfig(
+                Math.max(1, Toml.integer(t, "threshold", 5)),
+                games, http, mcsm, menu,
+                audience(Toml.string(t, "progress-audience", "voters")),
+                Toml.string(t, "sounds.vote", "ENTITY_PLAYER_LEVELUP"),
+                Toml.string(t, "sounds.denied", "ENTITY_VILLAGER_NO"),
+                messages, envNames, envMissing
+        );
+    }
+
+    /**
+     * 把 ${env:NAME}（或 ${env:NAME:-默认值}）换成环境变量的值。
+     *
+     * <p>取不到且没写默认值 → 置空并记进 missing（插件加载完会打警告）。
+     * 绝不保留 {@code ${env:xxx}} 字面量：密钥万一没配，宁可发空也不要把占位符原样发给面板。
+     */
+    private static String env(String text, Set<String> names, Set<String> missing) {
+        return env(text, System::getenv, names, missing);
+    }
+
+    /** 和上面一样，但取值来源可换（测试时不用真去设系统环境变量） */
+    static String env(String text, Function<String, String> lookup, Set<String> names, Set<String> missing) {
+        if (text == null || text.isEmpty() || text.indexOf("${env:") < 0) {
+            return text == null ? "" : text;
+        }
+        Matcher m = ENV_TOKEN.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        while (m.find()) {
+            String name = m.group(1);
+            if (names != null) {
+                names.add(name);
+            }
+            String v = lookup == null ? null : lookup.apply(name);
+            if (v == null) {
+                v = m.group(2);                 // ${env:X:-默认值} 里的默认值
+                if (v == null) {
+                    v = "";
+                    if (missing != null) {
+                        missing.add(name);
+                    }
+                }
+            }
+            m.appendReplacement(sb, Matcher.quoteReplacement(v));
+        }
+        m.appendTail(sb);
+        return sb.toString();
+    }
+
+    /** 播报范围：voters（默认）/ all / none，写别的或写歪都按 voters */
+    private static Audience audience(String raw) {
+        String v = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
+        switch (v) {
+            case "all":
+            case "everyone":
+                return Audience.ALL;
+            case "none":
+            case "off":
+            case "false":
+                return Audience.NONE;
+            default:
+                return Audience.VOTERS;
+        }
+    }
+
+    /** 把 ["2","3"] 这样的配置读成状态码集合；没配或全写歪了就用默认值 */
+    private static Set<Integer> intSet(List<String> raw, int... def) {
+        Set<Integer> out = new LinkedHashSet<>();
+        for (String s : raw) {
+            try {
+                out.add(Integer.parseInt(s.trim()));
+            } catch (NumberFormatException ignored) {
+                // 写歪的那项跳过
+            }
+        }
+        if (out.isEmpty()) {
+            for (int d : def) {
+                out.add(d);
+            }
+        }
+        return out;
+    }
+
+    /** 取一条消息原文（含 & 颜色码）；配置里没有就用内置默认。 */
+    public String msg(String key) {
+        String v = messages.get(key);
+        if (v == null || v.isEmpty()) {
+            v = DEFAULT_MESSAGES.get(key);
+        }
+        return v == null ? "" : v;
+    }
+
+    /** 兼容老配置里写的 no-url：本质就是"没配实例 uuid" */
+    public String msgNoUuid() {
+        String v = messages.get("no-uuid");
+        if (v == null || v.isEmpty()) {
+            v = messages.get("no-url");
+        }
+        if (v == null || v.isEmpty()) {
+            v = DEFAULT_MESSAGES.get("no-uuid");
+        }
+        return v == null ? "" : v;
+    }
+
+    public Game game(String id) {
+        return id == null ? null : games.get(id.toLowerCase(Locale.ROOT));
+    }
+
+    /** 显示名（去掉颜色码），给占位符这类纯文本场合用 */
+    public String plainName(String id) {
+        Game g = game(id);
+        if (g == null) {
+            return id;
+        }
+        return COLOR_CODE.matcher(g.name).replaceAll("");
+    }
+}

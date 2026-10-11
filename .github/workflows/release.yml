@@ -1,0 +1,54 @@
+name: 发布 Release
+
+# 打 tag 就构建并把 jar 挂到 Release：
+#   git tag v1.0.0 && git push origin v1.0.0
+# 手动触发（Actions 页面 Run workflow）只构建、不发 Release。
+#
+# 版本号唯一真源是 pom.xml 的 <version>，plugin.yml 由 resources filtering 填进去。
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v5
+
+      # --release 17，但 paper-api 是较新的 class 版本，必须用 JDK 21+ 编译
+      - name: 准备 JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: 构建
+        run: mvn -B clean package
+
+      - name: 收集产物
+        run: |
+          mkdir -p dist
+          find target -maxdepth 1 -name '*.jar' -not -name 'original-*.jar' -exec cp {} dist/ \;
+          ls -l dist
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v5
+        with:
+          name: MiniGameVote
+          path: dist/*.jar
+
+      - name: 发布到 Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          files: dist/*.jar
+          generate_release_notes: true
