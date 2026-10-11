@@ -53,20 +53,36 @@
 
 ### ⚠️ 菜单上的票数不刷新？
 
-**TrMenu 打开菜单后不会重新解析占位符**，所以投票完票数不会自己变。解决办法：每个投票物品的
-点击动作里带上 `refresh`（仓库里的菜单样例已经这么写了）：
+TrMenu 会把图标构建出来的 `ItemStack` **按会话 id 缓存**（`Item` 里是
+`HashMap<sessionId, ItemStack>`），菜单开着的时候 lore 里的占位符不会再解析。
+所以要让票数动起来，得让 TrMenu 重建物品：
+
+1. **图标加 `update: 20`** —— 每 20 tick（1 秒）重建一次，兜底
+2. **投票动作用 `update` 而不是 `refresh`** —— 反编译 TrMenu 3.12.4 确认过：
+   `refresh` 只调 `Icon.onRefresh()` 重新筛选子图标，**不重建物品**；
+   `update` 才是 `onReset()` + `settingItem()`，会真的重新解析 lore
 
 ```yaml
+  A:
+    update: 20              # ← 周期重建，没这行票数永远停在打开菜单那一刻
+    display:
+      material: PINK_WOOL
+      name: '&b躲猫猫'
+      lore:
+        - '&7当前票数：&e%minigamevote_votes_hide% &7/ &e%minigamevote_threshold%'
     actions:
       all:
         - 'player: votegame hide'
         - 'sound: entity.item.pickup'
-        - 'refresh'          # ← 没有这行，票数要等下次打开菜单才更新
+        - 'update'          # ← 不带参数 = 刷新本菜单所有图标
 ```
+
+`update` 动作的两个坑：不带参数是刷新全部；带参数时参数是**图标 id**（多个用 `;` 分隔），
+它**不认 `*` 通配符**（写 `update: *` 会静默什么都不刷新）。
 
 排查顺序：
 
-1. 菜单动作里有没有 `refresh` —— 没有就加上，然后 `trm reload`
+1. 菜单改完有没有 `trm reload` —— TrMenu 不会自己发现菜单文件变了
 2. 占位符注册了没 —— `/papi parse me %minigamevote_votes_hide%`，
    返回数字说明插件侧正常（问题在菜单），返回空说明扩展没注册，看后台日志
    有没有"已注册 PlaceholderAPI 扩展"

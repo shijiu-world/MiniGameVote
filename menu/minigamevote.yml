@@ -1,9 +1,11 @@
 title: '&a&l小游戏投票 &7| &e%player_name%'
 rows: 3
 
+# ⚠ layout 每行必须是 9 格（rows: 3 → 3 行 × 9 格）。
+#   多一格少一格都会让 TrMenu 错位或加载失败。
 layout:
   - '#########'
-  - '#ABCDEF##'
+  - '#ABCDEF#'
   - '#I#####H#'
 
 events:
@@ -24,7 +26,21 @@ icons:
     actions:
       all: []
 
+  # ───────────────────────────────────────────────────────────────
+  # ⚠ 每个带票数占位符的图标都必须有 update: 20
+  #   TrMenu 把图标构建出来的 ItemStack 按会话 id 缓存起来了
+  #   （Item 里是 HashMap<sessionId, ItemStack>），菜单开着的时候
+  #   lore 里的占位符不会再解析一次 —— 不写这行，投完票数字不动。
+  #   20 = 每 20 tick（1 秒）重建一次图标。嫌费性能就调大，比如 40。
+  #
+  # ⚠ 投票动作里必须是 'update' 而不是 'refresh'
+  #   refresh 动作只重新筛选子图标（走 Icon.onRefresh），根本不重建
+  #   物品；update 动作才是 onReset + settingItem，会真的重解析 lore。
+  #   update 不带参数 = 刷新本菜单所有图标；带参数时是图标 id，
+  #   用分号分隔 —— 注意它不认 '*' 这个通配符。
+  # ───────────────────────────────────────────────────────────────
   A:
+    update: 20
     display:
       material: PINK_WOOL
       name: '&b躲猫猫'
@@ -38,11 +54,10 @@ icons:
       all:
         - 'player: votegame hide'
         - 'sound: entity.item.pickup'
-        # ⚠ 必须有 refresh：TrMenu 打开菜单后不会自动重解析占位符，
-        #   没这行的话票数要等下次打开菜单才会变
-        - 'refresh'
+        - 'update'
 
   B:
+    update: 20
     display:
       material: TNT
       name: '&cTNTRun'
@@ -56,9 +71,10 @@ icons:
       all:
         - 'player: votegame tntrun'
         - 'sound: entity.item.pickup'
-        - 'refresh'
+        - 'update'
 
   C:
+    update: 20
     display:
       material: RED_BED
       name: '&e起床战争'
@@ -72,9 +88,10 @@ icons:
       all:
         - 'player: votegame bedwars'
         - 'sound: entity.item.pickup'
-        - 'refresh'
+        - 'update'
 
   D:
+    update: 20
     display:
       material: IRON_SWORD
       name: '&a谁是杀手'
@@ -88,9 +105,10 @@ icons:
       all:
         - 'player: votegame murder'
         - 'sound: entity.item.pickup'
-        - 'refresh'
+        - 'update'
 
   E:
+    update: 20
     display:
       material: DIAMOND_BOOTS
       name: '&d跑酷'
@@ -104,9 +122,10 @@ icons:
       all:
         - 'player: votegame parkour'
         - 'sound: entity.item.pickup'
-        - 'refresh'
+        - 'update'
 
   F:
+    update: 20
     display:
       material: DIAMOND_HOE
       name: '&6QUAKE'
@@ -120,15 +139,17 @@ icons:
       all:
         - 'player: votegame quake'
         - 'sound: entity.item.pickup'
-        - 'refresh'
+        - 'update'
 
   I:
+    update: 20
     display:
       material: 'head:%player_name%'
       name: '&b%player_name% &6的投票'
       lore:
         - '&7你当前投给：&f%minigamevote_mine%'
-        - '&7每人一票，退出服务器即作废'
+        - '&7可以改票，换一个就会自动取消上一票'
+        - '&7退出服务器即作废'
         - ''
         - '&7当前最多票：&e%minigamevote_leading%'
         - '&7已投票人数：&e%minigamevote_total%'

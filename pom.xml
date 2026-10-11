@@ -14,11 +14,11 @@
 
     <groupId>cn.shijiu</groupId>
     <artifactId>minigamevote</artifactId>
-    <version>1.1.1</version>
+    <version>1.1.2</version>
     <packaging>jar</packaging>
 
     <name>MiniGameVote</name>
-    <description>大厅小游戏投票：/votegame 打开 TrMenu 菜单投票，达标后异步发 HTTP 开启小游戏</description>
+    <description>小游戏投票插件</description>
 
     <properties>
         <!-- release 17：class 61，1.17+ 的服务端都能加载 -->
