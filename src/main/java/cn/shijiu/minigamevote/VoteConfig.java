@@ -125,6 +125,8 @@ public final class VoteConfig {
         m.put("vote-success", "&a你投给了 &f%game% &a（%votes%/%threshold%）");
         m.put("vote-changed", "&a你改投给了 &f%game% &a（%votes%/%threshold%），原 &7%old%&a 的一票已取消");
         m.put("already-voted", "&c你当前已经投给 &f%game%&c 了，换一个就自动改票");
+        m.put("vote-cancelled", "&a已取消你投给 &f%game% &a的那一票，可以重新投一个");
+        m.put("cancel-none", "&c你还没有投过票，没什么可取消的");
         m.put("unknown-game", "&c未知的小游戏：&f%id%");
         m.put("progress", "&7%player% &f投给了 &e%game% &7（%votes%/%threshold%）");
         m.put("progress-changed", "&7%player% &f改投给了 &e%game% &7（%votes%/%threshold%）");

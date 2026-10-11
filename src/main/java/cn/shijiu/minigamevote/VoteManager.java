@@ -71,13 +71,23 @@ public final class VoteManager {
         return new Cast(true, gameId, old);
     }
 
-    /** 玩家退出 / 被踢：他的票作废 */
-    public synchronized void remove(UUID uuid) {
+    /**
+     * 主动取消自己的票（菜单按钮 / {@code /votegame cancel}）。
+     *
+     * @return 被取消的小游戏 id；本来就没投过票返回 null
+     */
+    public synchronized String cancel(UUID uuid) {
         String gameId = voted.remove(uuid);
         if (gameId == null) {
-            return;
+            return null;
         }
         decrement(gameId);
+        return gameId;
+    }
+
+    /** 玩家退出 / 被踢：他的票作废 */
+    public synchronized void remove(UUID uuid) {
+        cancel(uuid);
     }
 
     /** 某个小游戏减一票；减到 0 就把计数整个移除（省得留下 0 票的僵尸条目） */

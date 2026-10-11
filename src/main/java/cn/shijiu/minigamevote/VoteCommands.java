@@ -50,8 +50,31 @@ public final class VoteCommands implements TabExecutor {
             return true;
         }
 
+        if (args[0].equalsIgnoreCase("cancel") || args[0].equalsIgnoreCase("unvote")) {
+            cancel(player);
+            return true;
+        }
+
         cast(player, args[0].toLowerCase(Locale.ROOT));
         return true;
+    }
+
+    /** 取消自己的票。没投过票什么都不做，只提示一声。 */
+    private void cancel(Player player) {
+        VoteConfig c = plugin.config();
+        String id = plugin.votes().cancel(player.getUniqueId());
+        if (id == null) {
+            Msg.send(player, c.msg("prefix") + c.msg("cancel-none"));
+            MiniGameVote.play(player, c.soundDenied, 1.0f);
+            return;
+        }
+        Msg.send(player, c.msg("prefix") + Msg.fill(c.msg("vote-cancelled"),
+                "game", c.plainName(id),
+                "votes", String.valueOf(plugin.votes().votesOf(id)),
+                "threshold", String.valueOf(c.threshold)));
+        MiniGameVote.play(player, c.soundVote, 1.0f);
+        // 让别人开的菜单也看到这一票没了
+        plugin.refreshMenus();
     }
 
     private void cast(Player player, String id) {
@@ -105,6 +128,7 @@ public final class VoteCommands implements TabExecutor {
         }
         List<String> options = new ArrayList<>(plugin.config().games.keySet());
         options.add("stats");
+        options.add("cancel");
         String prefix = args[0].toLowerCase(Locale.ROOT);
         options.removeIf(s -> !s.toLowerCase(Locale.ROOT).startsWith(prefix));
         Collections.sort(options);

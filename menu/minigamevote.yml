@@ -10,7 +10,7 @@ layout:
   - '##D#E#F##'
   - '#########'
   - '####I####'
-  - '###G#H###'
+  - '##G#X#H##'
 
 events:
   open:
@@ -156,6 +156,24 @@ icons:
         - 'close'
         - 'player: votegame stats'
         - 'sound: entity.item.pickup'
+
+  # 取消投票：撤回自己那一票。本来就没投过票时点了只会提示一声，
+  # 不会报错。取消完票数会立刻减，菜单上的数字同步变。
+  X:
+    display:
+      material: RED_WOOL
+      name: '&c取消我的投票'
+      lore:
+        - '&7撤回你投的那一票，可以再重新投'
+        - ''
+        - '&7你当前投给：&f%minigamevote_mine%'
+        - ''
+        - '&c▶ 点击取消'
+    actions:
+      all:
+        - 'player: votegame cancel'
+        - 'sound: entity.item.pickup'
+        - 'update'
 
   # 头像只做展示，不再兼职输出排行（排行看上面的 G）
   I:

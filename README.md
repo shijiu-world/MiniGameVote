@@ -11,6 +11,8 @@
 1. 玩家 `/votegame` → 由控制台执行 `menu.open-command` 打开 TrMenu 菜单
 2. 点某个小游戏（或 `/votegame <id>`）→ 投一票，一人一票；
    **已经投过的再投别的 = 改票**，上一票自动取消（投的还是同一个则不算数，也不重复播报）
+3. 玩家自己取消（菜单里的「取消我的投票」或 `/votegame cancel`）→ 那一票立刻扣掉，
+   可以再重新投；本来就没投过票时点了只会提示一声，不会报错
 3. 玩家退出子服（掉线 / 切服）→ 他投的票自动作废，也收不到后续播报
 3. 每投一票的播报（`progress-audience`）：默认只发给**已经投过票**的玩家，
    没投票的人不会被打扰；投票者本人收到的是 `vote-success` 那条确认，不重复发
@@ -29,6 +31,7 @@
 | `/votegame` | 打开投票菜单 | `minigamevote.vote`（默认所有人） |
 | `/votegame <id>` | 直接投票 | 同上 |
 | `/votegame stats` | 看票数排名（**票数降序**） | 同上 |
+| `/votegame cancel` | 取消自己那一票（`unvote` 同义） | 同上 |
 | `/votegameadmin reload` | 重载配置（⚠ 清空票数） | `minigamevote.admin`（默认 op） |
 | `/votegameadmin reset` | 重置票数 | 同上 |
 | `/votegameadmin stats` | 看票数排名（同上） | 同上 |
@@ -48,6 +51,9 @@
 - 玩家 `/votegame` → 插件让控制台执行 `[menu] open-command`（默认 `trm open minigamevote %player%`）
 - 点和占位符是一一对应的：`%minigamevote_votes_<id>%` 里的 `<id>` 必须等于 `config.toml` 里
   `[games.<id>]` 那个节名，改游戏时两边都要改
+- 菜单样例是 6×9：6 个小游戏摆成 2 行 × 3 列，倒数第二行是玩家头像（只展示你投给了谁），
+  最后一行是「查看投票排行 / 取消我的投票 / 关闭」三个按钮
+- ⚠ layout 每行必须正好 9 格，多一格少一格 TrMenu 会错位甚至加载失败
 - 不装 TrMenu 也能用，只是 `/votegame` 开不出菜单，得靠 `/votegame <id>` 或者自己接别的菜单插件
 
 > 菜单文件所在的服务端和投票插件所在的服务端必须是**同一个**（占位符读的是本地票数）。

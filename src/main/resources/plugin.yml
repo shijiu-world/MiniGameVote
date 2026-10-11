@@ -9,7 +9,7 @@ softdepend: [PlaceholderAPI, TrMenu]
 commands:
   votegame:
     description: 打开小游戏投票菜单 / 给某个小游戏投票
-    usage: /votegame [<小游戏id>|stats]
+    usage: /votegame [<小游戏id>|stats|cancel]
     aliases: [vg]
   votegameadmin:
     description: 小游戏投票管理
