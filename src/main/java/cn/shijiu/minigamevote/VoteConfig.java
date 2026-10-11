@@ -180,6 +180,8 @@ public final class VoteConfig {
         m.put("opened-menu", "&a已为 &f%player% &a打开投票菜单");
         m.put("test-result", "&7状态码：&e%code% &7(ok=%ok%)");
         m.put("test-body", "&7响应：&f%body%");
+        m.put("test-probe", "&7读到的实例状态：&f%list%");
+        m.put("test-probe-bad", "&c读不出实例状态：&f%reason% &7（uuid 不对？没权限？看上面的响应原文）");
         DEFAULT_MESSAGES = Collections.unmodifiableMap(m);
     }
 

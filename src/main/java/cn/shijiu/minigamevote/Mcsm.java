@@ -187,20 +187,66 @@ public final class Mcsm {
      * ⚠ 顶层那个 "status":200 是 HTTP 层的状态码，别拿它当实例状态——必须从 data 里取。
      */
     public Map<String, Integer> parseStatuses(String body) {
+        return probe(body).statuses;
+    }
+
+    /**
+     * 一次状态查询的结果。
+     *
+     * <p>⚠ {@link #valid} 为 false 时 {@link #statuses} 是空的，这时<b>不能当成"实例停着"</b> ——
+     * 它只代表"没查到"，真实状态未知。这两件事必须分开，否则：
+     * 实例 uuid 写错 / 没权限 / 面板业务码非 200 时，面板照样回 HTTP 200 但 {@code data} 是 null，
+     * 旧写法解析出空表 → 循环什么都不做 → 判定"全都空闲" → 对<b>本来就在跑的</b>实例
+     * 再发一次开启请求。
+     */
+    public static final class Probe {
+        /** 响应可信：业务码 200 且真的读到了实例状态 */
+        public final boolean valid;
+
+        /** 实例 uuid → 状态码；不可信时是空表 */
+        public final Map<String, Integer> statuses;
+
+        /** 不可信的原因（写进日志，不含密钥） */
+        public final String reason;
+
+        Probe(boolean valid, Map<String, Integer> statuses, String reason) {
+            this.valid = valid;
+            this.statuses = statuses;
+            this.reason = reason;
+        }
+    }
+
+    /**
+     * 解读一次 {@code /api/instance} 的响应。
+     *
+     * <p>⚠ 只看 HTTP 状态码是不够的：面板在「uuid 不存在 / 没权限 / 参数不对」时
+     * 也是回 HTTP 200，区别在<b>业务码</b>和 {@code data} 是不是 null。
+     */
+    public Probe probe(String body) {
         Map<String, Integer> out = new LinkedHashMap<>();
         Object root = Json.parse(body);
         if (root == null) {
-            return out;
+            return new Probe(false, out, "响应不是合法 JSON（或为空）");
+        }
+        Integer code = Json.integer(Json.at(root, "status"));
+        if (code != null && code != 200) {
+            return new Probe(false, out, "面板业务码 " + code + "（多半是 uuid 不对或没权限）");
+        }
+        if (Json.at(root, "data") == null) {
+            return new Probe(false, out, "data 为 null（实例 uuid 不对或没权限）");
         }
         List<Object> arr = Json.array(Json.at(root, "data.data"));
         if (arr != null) {
             for (Object item : arr) {
                 put(out, item);
             }
-            return out;
+        } else {
+            put(out, Json.at(root, "data"));
         }
-        put(out, Json.at(root, "data"));
-        return out;
+        if (out.isEmpty()) {
+            return new Probe(false, out, "响应里没有实例状态字段（instanceUuid / status）");
+        }
+        return new Probe(true, out, null);
     }
 
     private void put(Map<String, Integer> out, Object item) {

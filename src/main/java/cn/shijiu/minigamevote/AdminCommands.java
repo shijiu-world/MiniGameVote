@@ -126,6 +126,24 @@ public final class AdminCommands implements TabExecutor {
                             }
                             Msg.send(target, cfg.msg("prefix") + Msg.fill(cfg.msg("test-result"), "code", code, "ok", ok));
                             Msg.send(target, cfg.msg("prefix") + Msg.fill(cfg.msg("test-body"), "body", body));
+                            // 顺手把"插件从这段响应里读出了什么"显示出来：
+                            // 读不出实例状态时，多半是 uuid 不对 / 没权限 / 业务码非 200
+                            Mcsm svc = new Mcsm(cfg);
+                            Mcsm.Probe probe = svc.probe(r == null ? "" : r.body);
+                            if (probe.valid) {
+                                StringBuilder sb = new StringBuilder();
+                                for (Map.Entry<String, Integer> e : probe.statuses.entrySet()) {
+                                    if (sb.length() > 0) {
+                                        sb.append("、");
+                                    }
+                                    sb.append(svc.displayName(e.getKey())).append(" ")
+                                            .append(Mcsm.statusText(e.getValue()))
+                                            .append(svc.isBusy(e.getKey(), e.getValue()) ? "（算占用）" : "（算空闲）");
+                                }
+                                Msg.send(target, cfg.msg("prefix") + Msg.fill(cfg.msg("test-probe"), "list", sb.toString()));
+                            } else {
+                                Msg.send(target, cfg.msg("prefix") + Msg.fill(cfg.msg("test-probe-bad"), "reason", probe.reason));
+                            }
                         }));
                 return true;
             }

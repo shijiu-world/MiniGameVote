@@ -78,8 +78,24 @@ public final class VoteFlow {
                         }
                         continue;
                     }
-                    Map<String, Integer> statuses = mcsm.parseStatuses(r.body);
-                    for (Map.Entry<String, Integer> e : statuses.entrySet()) {
+                    // ⚠ 查不到 ≠ 没在跑：面板回 200 但 data 为 null（uuid 不对/没权限）
+                    // 也走这里。这种"状态不明"必须跟"真的停着 status=0"分开处理，
+                    // 否则会对本来就在跑的实例再发一次开启请求。
+                    Mcsm.Probe probe = mcsm.probe(r.body);
+                    if (!probe.valid) {
+                        String where = Mcsm.mask(urls.get(i), c.mcsm.apikey);
+                        if (c.mcsm.errorMeansBusy) {
+                            busy = true;
+                            plugin.getLogger().warning("查询实例状态失败：" + where
+                                    + " → " + probe.reason + "（按 on-query-error=busy 当作有小游戏在跑）");
+                            detail = "状态查询失败（" + probe.reason + "）";
+                        } else {
+                            plugin.getLogger().warning("查询实例状态失败：" + where
+                                    + " → " + probe.reason + "（按 on-query-error=idle 当作空闲，继续开服）");
+                        }
+                        continue;
+                    }
+                    for (Map.Entry<String, Integer> e : probe.statuses.entrySet()) {
                         if (mcsm.isBusy(e.getKey(), e.getValue())) {
                             busy = true;
                             detail = mcsm.displayName(e.getKey()) + " " + Mcsm.statusText(e.getValue());
