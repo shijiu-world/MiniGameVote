@@ -45,7 +45,7 @@ daemon-id = "xxx"                                 # 守护进程 uuid ⚠ 上线
 apikey = "${env:MCSM_KEY}"                        # 🔐 api-key，走环境变量；取不到会后台告警并当作空
 
 busy-status = [2, 3]          # 哪些状态码算「有小游戏在跑」→ 有就作废本轮
-on-query-error = "idle"       # 查不到时：idle 当空闲继续开 / busy 当占用作废（更保守）
+on-query-error = "busy"       # 查不到时：idle 当空闲继续开 / busy 当占用作废（更保守）
 watch = []                    # 除小游戏外，还有哪些实例在跑也算占用；一般留空
 
 
