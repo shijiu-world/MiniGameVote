@@ -176,13 +176,14 @@ public final class AdminCommands implements TabExecutor {
                 boolean installed = plugin.getServer().getPluginManager().isPluginEnabled("TrMenu");
                 TrMenuHook hook = plugin.trMenu();
 
+                // 先问 hook 再问面板：TrMenu 可能是后加载的，enabled 判断会滞后
                 String state;
                 if (!m.autoRefresh) {
                     state = cfg.msg("diag-off");
-                } else if (!installed) {
-                    state = cfg.msg("diag-no-plugin");
                 } else if (hook != null && hook.available()) {
                     state = cfg.msg("diag-ok");
+                } else if (!installed) {
+                    state = cfg.msg("diag-no-plugin");
                 } else {
                     state = cfg.msg("diag-failed");
                 }
@@ -190,6 +191,27 @@ public final class AdminCommands implements TabExecutor {
                         "state", state,
                         "menu", m.menuId,
                         "auto", String.valueOf(m.autoRefresh)));
+                if (hook != null) {
+                    long at = hook.lastRefreshAt();
+                    if (at <= 0) {
+                        Msg.send(sender, cfg.msg("prefix") + cfg.msg("diag-never"));
+                    } else {
+                        long sec = Math.max(0, (System.currentTimeMillis() - at) / 1000);
+                        String ago = sec < 60 ? sec + " 秒" : (sec / 60) + " 分" + (sec % 60) + " 秒";
+                        Msg.send(sender, cfg.msg("prefix") + Msg.fill(cfg.msg("diag-last"),
+                                "ago", ago,
+                                "players", String.valueOf(hook.lastPlayers()),
+                                "icons", String.valueOf(hook.lastIcons()),
+                                "count", String.valueOf(hook.refreshCount())));
+                    }
+                    String err = hook.lastError();
+                    if (err != null && !err.isEmpty()) {
+                        Msg.send(sender, cfg.msg("prefix") + Msg.fill(cfg.msg("diag-error"), "error", err));
+                    }
+                }
+                Msg.send(sender, "&7兜底巡检：&f" + (m.watchdogTicks > 0
+                        ? "每 " + (m.watchdogTicks / 20) + " 秒比对一次票数快照，变了就补刷"
+                        : "已关闭（menu.watchdog-ticks = 0）"));
                 if (!m.autoRefresh) {
                     Msg.send(sender, "&7把 config.toml 里 [menu] auto-refresh 改成 true 再 reload");
                     Msg.send(sender, "&7不装这个也行：给菜单图标加一行 update: 40 自己轮询");

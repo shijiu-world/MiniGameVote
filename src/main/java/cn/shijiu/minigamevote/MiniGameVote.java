@@ -43,8 +43,26 @@ public final class MiniGameVote extends JavaPlugin {
     private final java.util.concurrent.atomic.AtomicInteger generation =
             new java.util.concurrent.atomic.AtomicInteger(0);
 
+    /** 兜底巡检用的票数快照：所有小游戏票数 + 投票人数拼成的字符串 */
+    private volatile String lastVoteSnapshot = "";
+
+    /** 主动刷新不可用时，警告最多 5 分钟一条，免得刷屏 */
+    private volatile long lastRefreshWarnAt = 0;
+
     public int generation() {
         return generation.get();
+    }
+
+    private String voteSnapshot() {
+        VoteConfig c = config;
+        if (c == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String id : c.games.keySet()) {
+            sb.append(id).append('=').append(manager.votesOf(id)).append(';');
+        }
+        return sb.append("total=").append(manager.totalVoters()).toString();
     }
 
     @Override
@@ -67,7 +85,9 @@ public final class MiniGameVote extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new VoteListener(this), this);
 
         // 主动刷新菜单：票数一变就推给所有正开着菜单的人（软依赖，TrMenu 没装就跳过）
-        this.trMenu = new TrMenuHook(getLogger());
+        // ⚠ 这里只做"能接就接"，接不上不报错 —— TrMenu 可能是后加载/热加载的，
+        //   那种情况下由 TrMenuHook 在第一次刷新时自己再试（懒接入），不会因为启动顺序永久失效。
+        this.trMenu = new TrMenuHook(this, getLogger());
         if (config.menu.autoRefresh) {
             if (!getServer().getPluginManager().isPluginEnabled("TrMenu")) {
                 getLogger().info("未检测到 TrMenu：菜单只能靠玩家点击时刷新"
@@ -75,6 +95,24 @@ public final class MiniGameVote extends JavaPlugin {
             } else if (trMenu.prepare()) {
                 getLogger().info("已接入 TrMenu：票数变化会主动刷新菜单 " + config.menu.menuId);
             }
+        }
+
+        // 兜底巡检：定时比对票数快照，变了就补刷一次。
+        // 正常路径（投票/改票/取消/退出/重置）都已经主动刷了，这是为了防止哪条路径漏掉。
+        if (config.menu.autoRefresh && config.menu.watchdogTicks > 0) {
+            long period = Math.max(20L, config.menu.watchdogTicks);
+            lastVoteSnapshot = voteSnapshot();
+            getServer().getScheduler().runTaskTimer(this, () -> {
+                VoteConfig c = config;
+                if (c == null || !c.menu.autoRefresh) {
+                    return;
+                }
+                String now = voteSnapshot();
+                if (!now.equals(lastVoteSnapshot)) {
+                    lastVoteSnapshot = now;
+                    refreshMenus();
+                }
+            }, period, period);
         }
 
         if (getServer().getPluginManager().isPluginEnabled("PlaceholderAPI")) {
@@ -152,6 +190,9 @@ public final class MiniGameVote extends JavaPlugin {
         generation.incrementAndGet();
         manager.reset();
         flow.forceUnlock();
+        // reload 会把票数清空（调阈值也会走到这里）→ 正开着菜单的人得跟着变，
+        // 否则菜单上还挂着 reload 之前的旧票数。
+        refreshMenus();
 
         if (!config.envMissing.isEmpty()) {
             getLogger().warning("config.toml 引用了 " + config.envMissing.size() + " 个没设置的环境变量："
@@ -231,14 +272,47 @@ public final class MiniGameVote extends JavaPlugin {
      */
     public void refreshMenus() {
         VoteConfig c = config;
-        if (trMenu == null || c == null || !c.menu.autoRefresh || !trMenu.available()) {
+        if (c == null || !c.menu.autoRefresh) {
             return;
         }
         String menuId = c.menu.menuId;
+        Runnable task = () -> {
+            VoteConfig cfg = config;
+            if (cfg == null || trMenu == null || !cfg.menu.autoRefresh) {
+                return;
+            }
+            if (trMenu.available()) {
+                trMenu.refresh(cfg.menu.menuId);
+                return;
+            }
+            // 接不上时的最后手段：对"界面标题里含关键词"的玩家重开一次菜单（会闪，但数字是准的）
+            String keyword = cfg.menu.fallbackReopenTitle;
+            if (keyword != null && !keyword.isEmpty()) {
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                    try {
+                        String title = p.getOpenInventory().getTitle();
+                        if (title != null && title.contains(keyword)) {
+                            openMenu(p);
+                        }
+                    } catch (Throwable ignored) {
+                        // 个别玩家界面状态异常就算了，不影响别人
+                    }
+                }
+            }
+            // 刷新没接上（没装 TrMenu / 版本对不上 / 菜单 id 不对）—— 限流提示，别每次投票都刷一行
+            long now = System.currentTimeMillis();
+            if (now - lastRefreshWarnAt > 5 * 60 * 1000L) {
+                lastRefreshWarnAt = now;
+                String err = trMenu.lastError();
+                getLogger().warning("菜单主动刷新不可用，菜单上的票数要玩家点了才会变"
+                        + (err == null ? "" : "（" + err + "）")
+                        + "。检查：/votegameadmin trmenu；兜底做法：菜单图标加 update: 40");
+            }
+        };
         if (Bukkit.isPrimaryThread()) {
-            trMenu.refresh(menuId);
+            task.run();
         } else {
-            Bukkit.getScheduler().runTask(this, () -> trMenu.refresh(menuId));
+            Bukkit.getScheduler().runTask(this, task);
         }
     }
 

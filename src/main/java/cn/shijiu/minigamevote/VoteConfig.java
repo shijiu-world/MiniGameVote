@@ -105,14 +105,28 @@ public final class VoteConfig {
         public final boolean autoRefresh;
         /** 要刷新的 TrMenu 菜单 id，对应 menus/<id>.yml 的文件名 */
         public final String menuId;
+        /**
+         * 兜底巡检间隔（tick）：定时比对票数快照，变了就补刷一次菜单。
+         * 0 = 关。用来兜住「某条改票数的路径忘了调刷新」这类漏网之鱼
+         * （比如玩家退出扣票、管理员重置），正常情况用不上。
+         */
+        public final int watchdogTicks;
+        /**
+         * 兜底重开：主动刷新接不上（TrMenu 版本对不上等）时的最后手段 ——
+         * 对"当前打开的界面标题里含这个关键词"的玩家重新开一次菜单。
+         * 空 = 关。会闪一下，但票数是准的，总比不动强。
+         */
+        public final String fallbackReopenTitle;
 
         Menu(boolean enabled, String openCommand, boolean reopenAfterVote,
-             boolean autoRefresh, String menuId) {
+             boolean autoRefresh, String menuId, int watchdogTicks, String fallbackReopenTitle) {
             this.enabled = enabled;
             this.openCommand = openCommand;
             this.reopenAfterVote = reopenAfterVote;
             this.autoRefresh = autoRefresh;
             this.menuId = menuId;
+            this.watchdogTicks = watchdogTicks;
+            this.fallbackReopenTitle = fallbackReopenTitle;
         }
     }
 
@@ -142,6 +156,9 @@ public final class VoteConfig {
         m.put("no-uuid", "&f%game% &e达到 &c%threshold% &e票，但该小游戏没配实例 uuid（或 MCSM 已关闭），仅重置票数");
         m.put("reset", "&a已重置所有票数与投票记录");
         m.put("diag-trmenu", "&7菜单主动刷新：%state% &7（菜单 &f%menu%&7，auto-refresh=%auto%）");
+        m.put("diag-last", "&7上次刷新：&f%ago% &7前（&a%players%&7 人 / &a%icons%&7 个图标），累计 &f%count%&7 次");
+        m.put("diag-never", "&7上次刷新：&c从来没有（一次都没成功刷过）");
+        m.put("diag-error", "&c最近一次问题：&f%error%");
         m.put("diag-ok", "&a已接入");
         m.put("diag-no-plugin", "&c没检测到 TrMenu");
         m.put("diag-failed", "&c接入失败");
@@ -239,7 +256,10 @@ public final class VoteConfig {
                 env(Toml.string(t, "menu.open-command", "trm open minigamevote %player%"), envNames, envMissing),
                 Toml.bool(t, "menu.reopen-after-vote", true),
                 Toml.bool(t, "menu.auto-refresh", true),
-                Toml.string(t, "menu.menu-id", "minigamevote")
+                Toml.string(t, "menu.menu-id", "minigamevote"),
+                // 兜底巡检：票数快照变了就补刷一次（0 = 关）。默认 30 秒，开销可忽略
+                Math.max(0, Toml.integer(t, "menu.watchdog-ticks", 600)),
+                Toml.string(t, "menu.fallback-reopen-title", "")
         );
 
         Map<String, String> messages = new LinkedHashMap<>();
