@@ -10,7 +10,7 @@ layout:
   - '##D#E#F##'
   - '#########'
   - '####I####'
-  - '####H####'
+  - '###G#H###'
 
 events:
   open:
@@ -137,6 +137,27 @@ icons:
         - 'sound: entity.item.pickup'
         - 'update'
 
+  # 独立出来的「查看排行」按钮。之前这个动作挂在头像 I 上，
+  # 点自己头像才看得到排行，藏得太深 —— 点这里直接看。
+  # 先 close 再执行命令：菜单开着会把聊天顶掉，排行有
+  # 表头 + 每个游戏一行，不关菜单看不全。
+  G:
+    display:
+      material: PAPER
+      name: '&e&l查看投票排行'
+      lore:
+        - '&7当前领先：&e%minigamevote_leading%'
+        - '&7已投票人数：&e%minigamevote_total%'
+        - '&7你投给了：&f%minigamevote_mine%'
+        - ''
+        - '&a▶ 点击查看完整排行'
+    actions:
+      all:
+        - 'close'
+        - 'player: votegame stats'
+        - 'sound: entity.item.pickup'
+
+  # 头像只做展示，不再兼职输出排行（排行看上面的 G）
   I:
     display:
       material: 'head:%player_name%'
@@ -149,9 +170,7 @@ icons:
         - '&7当前最多票：&e%minigamevote_leading%'
         - '&7已投票人数：&e%minigamevote_total%'
     actions:
-      all:
-        - 'player: votegame stats'
-        - 'sound: entity.item.pickup'
+      all: []
 
   H:
     display:
