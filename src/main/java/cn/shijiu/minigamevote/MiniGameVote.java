@@ -22,7 +22,7 @@ import java.util.logging.Level;
  *
  * 玩法：
  *   玩家 /votegame        → 打开 TrMenu 菜单（plugins/TrMenu/menus/minigamevote.yml）
- *   玩家 /votegame <id>   → 直接投票；一人一票
+ *   玩家 /votegame <id>   → 直接投票；一人一票，再投别的即改票（上一票取消）
  *   玩家退出子服          → 他投的票自动作废
  *   某个小游戏票数达标    → 异步查所有实例 → 都空闲才发开启请求 → 重置票数
  */
@@ -207,16 +207,18 @@ public final class MiniGameVote extends JavaPlugin {
 
     /**
      * 投票后的播报。{@code progress-audience = "voters"} 时只发给已经投过票的人：
-     * 投票者本人已经收到 vote-success 了，这里就不再重复发给他。
+     * 投票者本人已经收到 vote-success / vote-changed 了，这里就不再重复发给他。
+     *
+     * @param changed 这次是改票（文案用 progress-changed，玩家看得出票是挪过来的）
      *
      * <p>⚠ 收件人名单取自「当前在线且投过票」——玩家退出后票就没了，自然也收不到后续播报。
      */
-    public void announceVote(Player voter, String gameId, int votes) {
+    public void announceVote(Player voter, String gameId, int votes, boolean changed) {
         VoteConfig c = config;
         if (c.audience == VoteConfig.Audience.NONE) {
             return;
         }
-        String text = c.msg("prefix") + Msg.fill(c.msg("progress"),
+        String text = c.msg("prefix") + Msg.fill(c.msg(changed ? "progress-changed" : "progress"),
                 "player", voter.getName(),
                 "game", c.plainName(gameId),
                 "votes", String.valueOf(votes),

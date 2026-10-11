@@ -116,13 +116,15 @@ public final class VoteConfig {
         Map<String, String> m = new LinkedHashMap<>();
         m.put("prefix", "&6[小游戏投票] &r");
         m.put("vote-success", "&a你投给了 &f%game% &a（%votes%/%threshold%）");
-        m.put("already-voted", "&c你已经投过票了（当前投给 &f%game%&c）");
+        m.put("vote-changed", "&a你改投给了 &f%game% &a（%votes%/%threshold%），原 &7%old%&a 的一票已取消");
+        m.put("already-voted", "&c你当前已经投给 &f%game%&c 了，换一个就自动改票");
         m.put("unknown-game", "&c未知的小游戏：&f%id%");
         m.put("progress", "&7%player% &f投给了 &e%game% &7（%votes%/%threshold%）");
+        m.put("progress-changed", "&7%player% &f改投给了 &e%game% &7（%votes%/%threshold%）");
         m.put("no-permission", "&c你没有投票权限");
         m.put("usage", "&7用法：&a/votegame &7打开菜单，&a/votegame <id> &7直接投票");
         m.put("stats-header", "&6========== 小游戏投票 ==========");
-        m.put("stats-line", "&7- &f%game% &7：&e%votes%&7/&e%threshold%");
+        m.put("stats-line", "&7#%rank% &f%game% &7：&e%votes%&7/&e%threshold%");
         m.put("stats-total", "&7已投票人数：&e%total%");
         m.put("stats-none", "&7还没有人投票");
         m.put("threshold-reached", "&f%game% &e达到 &c%threshold% &e票，正在开启…（HTTP %code%）");
@@ -319,18 +321,6 @@ public final class VoteConfig {
         String v = messages.get(key);
         if (v == null || v.isEmpty()) {
             v = DEFAULT_MESSAGES.get(key);
-        }
-        return v == null ? "" : v;
-    }
-
-    /** 兼容老配置里写的 no-url：本质就是"没配实例 uuid" */
-    public String msgNoUuid() {
-        String v = messages.get("no-uuid");
-        if (v == null || v.isEmpty()) {
-            v = messages.get("no-url");
-        }
-        if (v == null || v.isEmpty()) {
-            v = DEFAULT_MESSAGES.get("no-uuid");
         }
         return v == null ? "" : v;
     }

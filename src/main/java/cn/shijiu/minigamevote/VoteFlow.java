@@ -166,7 +166,7 @@ public final class VoteFlow {
 
     private void noUuid(String gameId) {
         VoteConfig c = plugin.config();
-        Msg.broadcast(c.msg("prefix") + Msg.fill(c.msgNoUuid(),
+        Msg.broadcast(c.msg("prefix") + Msg.fill(c.msg("no-uuid"),
                 "game", c.plainName(gameId),
                 "threshold", String.valueOf(c.threshold)));
     }

@@ -103,6 +103,7 @@ denied = "ENTITY_VILLAGER_NO"    # 已投过 / 没权限
 #  支持 & 颜色码。可用变量：
 #    %game% 小游戏名    %id% 小游戏 id    %votes% 当前票数   %threshold% 阈值
 #    %player% 玩家名    %total% 投票人数   %code% HTTP 状态码  %detail% 占用实例
+#    %old%   改票前投的那个小游戏（只在 vote-changed 里有）
 #    %rank%  名次（从 1 起，只在 stats-line 里有；票数降序，同票按配置顺序）
 # ────────────────────────────────────────────────────────────────────────────
 
@@ -110,9 +111,12 @@ denied = "ENTITY_VILLAGER_NO"    # 已投过 / 没权限
 prefix = "&6[小游戏投票] &r"
 
 vote-success = "&a你投给了 &f%game% &a（%votes%/%threshold%）"
-already-voted = "&c你已经投过票了（当前投给 &f%game%&c）"
+# 已经投过的再投别的 → 改票，上一票自动取消；%old% 是他原来投的那个
+vote-changed = "&a你改投给了 &f%game% &a（%votes%/%threshold%），原 &7%old%&a 的一票已取消"
+already-voted = "&c你当前已经投给 &f%game%&c 了，换一个就自动改票"
 unknown-game = "&c未知的小游戏：&f%id%"
 progress = "&7%player% &f投给了 &e%game% &7（%votes%/%threshold%）"
+progress-changed = "&7%player% &f改投给了 &e%game% &7（%votes%/%threshold%）"
 no-permission = "&c你没有投票权限"
 usage = "&7用法：&a/votegame &7打开菜单，&a/votegame <id> &7直接投票"
 

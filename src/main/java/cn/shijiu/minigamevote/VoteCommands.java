@@ -65,19 +65,29 @@ public final class VoteCommands implements TabExecutor {
 
         VoteManager.Cast result = plugin.votes().cast(player.getUniqueId(), id);
         if (!result.success) {
+            // 投的还是同一个：不算数，也不重复播报
             Msg.send(player, c.msg("prefix") + Msg.fill(c.msg("already-voted"), "game", c.plainName(result.gameId)));
             MiniGameVote.play(player, c.soundDenied, 1.0f);
             return;
         }
 
         int votes = plugin.votes().votesOf(id);
-        Msg.send(player, c.msg("prefix") + Msg.fill(c.msg("vote-success"),
-                "game", game.name,
-                "votes", String.valueOf(votes),
-                "threshold", String.valueOf(c.threshold)));
+        if (result.changed()) {
+            // 改票：上一票已经扣掉了，提示里带上原来那个
+            Msg.send(player, c.msg("prefix") + Msg.fill(c.msg("vote-changed"),
+                    "game", game.name,
+                    "old", c.plainName(result.previous),
+                    "votes", String.valueOf(votes),
+                    "threshold", String.valueOf(c.threshold)));
+        } else {
+            Msg.send(player, c.msg("prefix") + Msg.fill(c.msg("vote-success"),
+                    "game", game.name,
+                    "votes", String.valueOf(votes),
+                    "threshold", String.valueOf(c.threshold)));
+        }
         MiniGameVote.play(player, c.soundVote, 2.0f);
 
-        plugin.announceVote(player, id, votes);
+        plugin.announceVote(player, id, votes, result.changed());
 
         if (c.menu.enabled && c.menu.reopenAfterVote) {
             plugin.openMenu(player);
