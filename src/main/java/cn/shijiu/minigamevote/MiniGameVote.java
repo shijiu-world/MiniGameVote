@@ -16,6 +16,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import java.util.logging.Level;
 
 /**
@@ -410,12 +411,19 @@ public final class MiniGameVote extends JavaPlugin {
     }
 
     /**
-     * 投票后的播报。{@code progress-audience = "voters"} 时只发给已经投过票的人：
-     * 投票者本人已经收到 vote-success / vote-changed 了，这里就不再重复发给他。
+     * 投票后的播报。
+     * <ul>
+     *   <li>{@code voters}（默认）—— 只发给已经投过票的人</li>
+     *   <li>{@code all} —— 发给全服</li>
+     *   <li>{@code none} —— 不播报</li>
+     * </ul>
+     * ⚠ 三种都不发给投票者本人：他已经收到 vote-success / vote-changed（「你投给了 xxx」），
+     * 再收到一条「xxx 投给了 xxx」就是同一件事说两遍。
      *
      * @param changed 这次是改票（文案用 progress-changed，玩家看得出票是挪过来的）
      *
-     * <p>⚠ 收件人名单取自「当前在线且投过票」——玩家退出后票就没了，自然也收不到后续播报。
+     * <p>⚠ {@code voters} 的收件人名单取自「当前在线且投过票」——玩家退出后票就没了，
+     * 自然也收不到后续播报。
      */
     public void announceVote(Player voter, String gameId, int votes, boolean changed) {
         VoteConfig c = config;
@@ -428,15 +436,14 @@ public final class MiniGameVote extends JavaPlugin {
                 "votes", String.valueOf(votes),
                 "threshold", String.valueOf(c.threshold));
 
-        if (c.audience == VoteConfig.Audience.ALL) {
-            Msg.broadcast(text);
-            return;
-        }
+        // ⚠ 三个 audience 都不再发给投票者本人：他已经收到 vote-success / vote-changed 了，
+        // 再收到一条「xxx 投给了 xxx」就是同一件事说两遍
+        UUID self = voter.getUniqueId();
         for (Player p : Bukkit.getOnlinePlayers()) {
-            if (p.getUniqueId().equals(voter.getUniqueId())) {
+            if (p.getUniqueId().equals(self)) {
                 continue;
             }
-            if (manager.votedGame(p.getUniqueId()) != null) {
+            if (c.audience == VoteConfig.Audience.ALL || manager.votedGame(p.getUniqueId()) != null) {
                 Msg.send(p, text);
             }
         }
