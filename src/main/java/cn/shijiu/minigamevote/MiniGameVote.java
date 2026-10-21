@@ -237,6 +237,13 @@ public final class MiniGameVote extends JavaPlugin {
                     + String.join("、", config.envMissing)
                     + " —— 这些位置已按空字符串处理，请在开服脚本里 export 后再 reload");
         }
+
+        // 密文密钥解不开时说一声 —— 不然表现为「面板一直 403」，很难往配置上想
+        String cryptErr = KeyCrypto.lastError();
+        if (cryptErr != null) {
+            getLogger().warning("[mcsm] apikey 是 ENC1: 密文但解不出来：" + cryptErr
+                    + " —— 请到配套加密页重新生成一次再填（别手改密文里的字符）");
+        }
     }
 
     /**

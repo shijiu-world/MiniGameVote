@@ -49,6 +49,15 @@ enabled = true                # false = 只计票不联网（调试用）
 url = "http://mc.com"                             # 面板地址，结尾别带斜杠
 daemon-id = "xxx"                                 # 守护进程 uuid ⚠ 上线前用 /votegameadmin test 核对
 apikey = "${env:MCSM_KEY}"                        # 🔐 api-key，走环境变量；取不到会后台告警并当作空
+                                                  # 三种写法，任选其一：
+                                                  #   1) ${env:MCSM_KEY}        环境变量（推荐，最安全；改完要重启服务端）
+                                                  #   2) ENC1:xxxx              用配套加密页把明文加密后的串（见下面说明）
+                                                  #   3) 明文                   直接写，谁拿到这个文件谁就有密钥
+                                                  # ⚠ 只有 2、3 这两种「写死在文件里」的会被当密文解：
+                                                  #   带 ENC1: 前缀才解，没前缀的明文原样用；环境变量取回来的值不解密
+                                                  # ENC1 密文从哪来：https://shijiu-world.github.io/MiniGameVote/
+                                                  #   （纯本地加密，不发网络；同一个明文每次生成的串都不一样，正常）
+                                                  # 解不开时插件开服会打一条 warning，并把密钥当空 —— 不会拿错的串去怼面板
 
 busy-status = [2, 3]          # 哪些状态码算「有小游戏在跑」→ 有就作废本轮
 on-query-error = "busy"       # 查不到时：idle 当空闲继续开 / busy 当占用作废（更保守）
